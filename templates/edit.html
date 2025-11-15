@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</title>
+	<style>
+		body { font-family: Arial, sans-serif; margin: 20px; max-width: 600px; }
+		label { display: block; margin-top: 10px; font-weight: bold; }
+		input { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ddd; 
+		        border-radius: 4px; box-sizing: border-box; }
+		.btn { background-color: #4CAF50; color: white; padding: 10px 20px; 
+		       border: none; border-radius: 4px; cursor: pointer; margin-top: 20px; }
+		.btn:hover { background-color: #45a049; }
+		.cancel { background-color: #999; margin-left: 10px; text-decoration: none;
+		          display: inline-block; padding: 10px 20px; color: white; border-radius: 4px; }
+		.cancel:hover { background-color: #888; }
+	</style>
+</head>
+<body>
+	<h1>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</h1>
+	<form method="POST">
+		<input type="hidden" name="id" value="{{.ID}}">
+		
+		<label>Vorname:</label>
+		<input type="text" name="firstName" value="{{.Contact.FirstName}}" required>
+		
+		<label>Nachname:</label>
+		<input type="text" name="lastName" value="{{.Contact.LastName}}" required>
+		
+		<label>Telefonnummer:</label>
+		<input type="text" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}" required>
+		
+		<button type="submit" class="btn">Speichern</button>
+		<a href="/contacts" class="cancel">Abbrechen</a>
+	</form>
+</body>
+</html>
