@@ -5,7 +5,7 @@ const { defineConfig, devices } = require('@playwright/test');
  * @see https://playwright.dev/docs/test-configuration
  */
 module.exports = defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -24,7 +24,7 @@ module.exports = defineConfig({
   ],
 
   webServer: {
-    command: './grandstream-telephonebook --data-dir ./tests/e2e/data',
+    command: '../grandstream-telephonebook --data-dir ./tests/data',
     url: 'http://localhost:8081',
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
