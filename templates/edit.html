@@ -2,6 +2,7 @@
 <html>
 <head>
 	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</title>
 	<style>
 		body { font-family: Arial, sans-serif; margin: 20px; max-width: 600px; }
@@ -29,7 +30,19 @@
 		.delete { background-color: #f44336; margin-right: auto; text-decoration: none;
 		          display: inline-block; padding: 10px 20px; color: white; border-radius: 4px; border: none; cursor: pointer; }
 		.delete:hover { background-color: #da190b; }
-		.form-buttons { margin-top: 20px; display: flex; justify-content: flex-end; align-items: center; }
+		.form-buttons { margin-top: 20px; display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 10px; }
+		
+		@media (max-width: 768px) {
+			body { margin: 10px; max-width: 100%; }
+			.breadcrumb { font-size: 14px; overflow-x: auto; white-space: nowrap; }
+			h1 { font-size: 1.5em; }
+			.phone-row { flex-direction: column; }
+			.phone-row > div { width: 100%; }
+			.form-buttons { flex-direction: row; }
+			.delete { margin-right: 0; order: 3; width: 100%; margin-top: 10px; }
+			.cancel { margin-right: 0; order: 1; flex: 1; }
+			.btn { order: 2; flex: 1; }
+		}
 	</style>
 </head>
 <body>

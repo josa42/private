@@ -2,6 +2,7 @@
 <html>
 <head>
 	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>vCard importieren</title>
 	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 	<style>
@@ -24,8 +25,18 @@
 		.cancel { background-color: #999; margin-right: 10px; text-decoration: none;
 		          display: inline-block; padding: 10px 20px; color: white; border-radius: 4px; }
 		.cancel:hover { background-color: #888; }
-		.form-buttons { margin-top: 20px; display: flex; justify-content: flex-end; align-items: center; }
+		.form-buttons { margin-top: 20px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
 		.file-info { margin-top: 10px; color: #666; font-size: 14px; }
+		
+		@media (max-width: 768px) {
+			body { margin: 10px; max-width: 100%; }
+			.breadcrumb { font-size: 14px; overflow-x: auto; white-space: nowrap; }
+			h1 { font-size: 1.5em; }
+			.upload-area { padding: 30px 20px; }
+			.upload-icon { font-size: 36px; }
+			.form-buttons { flex-direction: column-reverse; }
+			.form-buttons > * { width: 100%; text-align: center; }
+		}
 	</style>
 </head>
 <body>
