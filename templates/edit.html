@@ -67,10 +67,10 @@
 			<div>
 				<label>Telefonnummer:</label>
 				<input type="tel" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}" 
-				       pattern="^[\d\s+/()-]+$" 
-				       title="Nur Ziffern, Leerzeichen und die Zeichen + - / ( ) sind erlaubt"
+				       pattern="^[\d\s+]+$" 
+				       title="Nur Ziffern, Leerzeichen und + sind erlaubt"
 				       required
-				       oninvalid="this.setCustomValidity('Bitte geben Sie eine gültige Telefonnummer ein (nur Ziffern und + - / ( ) Leerzeichen)')"
+				       oninvalid="this.setCustomValidity('Bitte geben Sie eine gültige Telefonnummer ein (nur Ziffern, Leerzeichen und +)')"
 				       oninput="this.setCustomValidity('')">
 			</div>
 			<div>
