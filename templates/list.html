@@ -21,11 +21,13 @@
 		.container {
 			background: white;
 			border-radius: 12px;
-			padding: 30px;
+			padding: 0;
 			max-width: 680px;
 			width: 100%;
 			box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-			overflow: hidden;
+		}
+		.container-inner {
+			padding: 30px;
 		}
 		.breadcrumb { 
 			margin-bottom: 20px; 
@@ -35,10 +37,9 @@
 			top: 0;
 			background: white;
 			z-index: 11;
-			padding: 15px 0;
-			margin: -30px -30px 0 -30px;
-			padding-left: 30px;
-			padding-right: 30px;
+			padding: 15px 30px;
+			margin: 0;
+			border-radius: 12px 12px 0 0;
 		}
 		.breadcrumb a { color: #667eea; text-decoration: none; }
 		.breadcrumb a:hover { text-decoration: underline; }
@@ -55,10 +56,8 @@
 			top: 44px;
 			background: white;
 			z-index: 10;
-			padding: 15px 0;
+			padding: 15px 30px;
 			margin: 0 -30px 20px -30px;
-			padding-left: 30px;
-			padding-right: 30px;
 			border-bottom: 1px solid #e0e0e0;
 		}
 		.header h1 { margin: 0; }
@@ -97,10 +96,11 @@
 		
 		@media (max-width: 768px) {
 			body { padding: 0; padding-top: 0; background: white; }
-			.container { padding: 15px; max-width: 100%; border-radius: 0; box-shadow: none; }
+			.container { padding: 0; max-width: 100%; border-radius: 0; box-shadow: none; }
+			.container-inner { padding: 15px; }
 			.breadcrumb {
-				margin: -15px -15px 0 -15px;
 				padding: 10px 15px;
+				border-radius: 0;
 			}
 			.header { 
 				margin: 0 -15px 20px -15px; 
@@ -126,7 +126,8 @@
 			<span>›</span>
 			<span>Kontakte</span>
 		</nav>
-		<div class="header">
+		<div class="container-inner">
+			<div class="header">
 			<h1>Kontakte</h1>
 			<div>
 				<form action="/contacts/normalize" method="POST" style="display: inline;" onsubmit="return confirm('Alle Telefonnummern normalisieren (0... → +49..., Leerzeichen einfügen)?')">
@@ -171,6 +172,7 @@
 			</tr>
 			{{end}}
 		</table>
+		</div>
 	</div>
 </body>
 </html>
