@@ -66,6 +66,13 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	// Only handle root path, return 404 for other paths
+	if r.URL.Path != "/" {
+		w.WriteHeader(http.StatusNotFound)
+		templates.ExecuteTemplate(w, "404.html", nil)
+		return
+	}
+	
 	data := struct {
 		Host string
 	}{
