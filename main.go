@@ -221,6 +221,8 @@ func webImportHandler(w http.ResponseWriter, r *http.Request) {
 
 	templates.ExecuteTemplate(w, "import.html", nil)
 }
+
+func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		action := r.FormValue("action")
 		
