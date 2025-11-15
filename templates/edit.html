@@ -41,7 +41,7 @@
 		<span>{{if .IsNew}}Neuer Kontakt{{else}}{{if .Contact.CompanyName}}{{.Contact.CompanyName}}{{else if .Contact.FirstName}}{{.Contact.FirstName}} {{.Contact.LastName}}{{else}}{{.Contact.Phone.PhoneNumber}}{{end}}{{end}}</span>
 	</nav>
 	<h1>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</h1>
-	<form method="POST" onsubmit="return validateForm()">
+	<form method="POST">
 		<input type="hidden" name="id" value="{{.ID}}">
 		
 		<label>Kontakttyp:</label>
@@ -92,20 +92,35 @@
 			const contactType = document.getElementById('contactType').value;
 			const personFields = document.getElementById('personFields');
 			const companyFields = document.getElementById('companyFields');
+			const firstName = document.getElementById('firstName');
+			const lastName = document.getElementById('lastName');
+			const companyName = document.getElementById('companyName');
 			
 			if (contactType === 'person') {
 				personFields.classList.add('active');
 				companyFields.classList.remove('active');
-				document.getElementById('companyName').value = '';
+				companyName.value = '';
+				companyName.removeAttribute('required');
+				// At least one of firstName or lastName should be filled
+				// We'll use a custom validation approach
+				firstName.removeAttribute('required');
+				lastName.removeAttribute('required');
 			} else {
 				personFields.classList.remove('active');
 				companyFields.classList.add('active');
-				document.getElementById('firstName').value = '';
-				document.getElementById('lastName').value = '';
+				firstName.value = '';
+				lastName.value = '';
+				firstName.removeAttribute('required');
+				lastName.removeAttribute('required');
+				companyName.setAttribute('required', 'required');
 			}
 		}
 		
-		function validateForm() {
+		// Initialize on page load
+		toggleContactType();
+		
+		// Custom validation for person fields (at least one name required)
+		document.querySelector('form').addEventListener('submit', function(e) {
 			const contactType = document.getElementById('contactType').value;
 			
 			if (contactType === 'person') {
@@ -113,23 +128,20 @@
 				const lastName = document.getElementById('lastName').value.trim();
 				
 				if (!firstName && !lastName) {
-					alert('Bitte geben Sie mindestens Vor- oder Nachnamen ein.');
+					e.preventDefault();
+					document.getElementById('firstName').setCustomValidity('Bitte geben Sie mindestens Vor- oder Nachnamen ein.');
+					document.getElementById('firstName').reportValidity();
 					return false;
-				}
-			} else {
-				const companyName = document.getElementById('companyName').value.trim();
-				
-				if (!companyName) {
-					alert('Bitte geben Sie einen Firmennamen ein.');
-					return false;
+				} else {
+					document.getElementById('firstName').setCustomValidity('');
 				}
 			}
-			
-			return true;
-		}
+		});
 		
-		// Initialize on page load
-		toggleContactType();
+		// Clear custom validity on input
+		document.getElementById('firstName').addEventListener('input', function() {
+			this.setCustomValidity('');
+		});
 	</script>
 </body>
 </html>
