@@ -26,6 +26,7 @@ func init() {
 
 type Phone struct {
 	XMLName      xml.Name `xml:"Phone" json:"-"`
+	Type         string   `xml:"type,attr,omitempty" json:"type,omitempty"`
 	PhoneNumber  string   `xml:"phonenumber" json:"phoneNumber"`
 	AccountIndex int      `xml:"accountindex" json:"accountIndex"`
 }
@@ -258,11 +259,13 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		firstName := r.FormValue("firstName")
 		lastName := r.FormValue("lastName")
 		phoneNumber := r.FormValue("phoneNumber")
+		phoneType := r.FormValue("phoneType")
 
 		contact := Contact{
 			FirstName: firstName,
 			LastName:  lastName,
 			Phone: Phone{
+				Type:         phoneType,
 				PhoneNumber:  phoneNumber,
 				AccountIndex: 0,
 			},

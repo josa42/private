@@ -45,6 +45,13 @@
 		<label>Telefonnummer:</label>
 		<input type="text" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}" required>
 		
+		<label>Typ:</label>
+		<select name="phoneType" style="width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+			<option value="Mobile" {{if eq .Contact.Phone.Type "Mobile"}}selected{{end}}>Mobil</option>
+			<option value="Work" {{if eq .Contact.Phone.Type "Work"}}selected{{end}}>Firma</option>
+			<option value="Home" {{if eq .Contact.Phone.Type "Home"}}selected{{end}}>Privat</option>
+		</select>
+		
 		<div class="form-buttons">
 			{{if not .IsNew}}
 			<button type="submit" name="action" value="delete" class="delete" onclick="return confirm('Kontakt wirklich löschen?')">Löschen</button>
