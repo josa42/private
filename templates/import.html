@@ -21,16 +21,40 @@
 		.container {
 			background: white;
 			border-radius: 12px;
-			padding: 30px;
+			padding: 0;
 			max-width: 680px;
 			width: 100%;
 			box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 		}
+		.container-inner { padding: 30px; }
 		.breadcrumb { 
-			margin-bottom: 20px; 
+			margin-bottom: 0; 
 			color: #666;
 			font-size: 14px;
+			position: sticky;
+			top: 0;
+			background: white;
+			z-index: 11;
+			padding: 15px 30px;
+			margin: 0;
+			border-radius: 12px 12px 0 0;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
 		}
+		.breadcrumb-nav { display: flex; align-items: center; }
+		.logout-btn {
+			background-color: #999;
+			color: white;
+			padding: 6px 12px;
+			border-radius: 4px;
+			text-decoration: none;
+			font-size: 13px;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		}
+		.logout-btn:hover { background-color: #777; }
 		.breadcrumb a { color: #667eea; text-decoration: none; }
 		.breadcrumb a:hover { text-decoration: underline; }
 		.breadcrumb span { margin: 0 5px; }
@@ -99,8 +123,15 @@
 		
 		@media (max-width: 768px) {
 			body { padding: 0; padding-top: 0; background: white; }
-			.container { padding: 15px; max-width: 100%; border-radius: 0; box-shadow: none; }
-			.breadcrumb { font-size: 12px; overflow-x: auto; white-space: nowrap; }
+			.container { padding: 0; max-width: 100%; border-radius: 0; box-shadow: none; }
+			.container-inner { padding: 15px; }
+			.breadcrumb { 
+				font-size: 12px; 
+				overflow-x: auto; 
+				white-space: nowrap; 
+				padding: 10px 15px;
+				border-radius: 0;
+			}
 			h1 { font-size: 1.5em; }
 			.upload-area { padding: 30px 20px; }
 			.upload-icon { font-size: 36px; }
@@ -112,12 +143,19 @@
 <body>
 	<div class="container">
 		<nav class="breadcrumb">
-			<a href="/">Home</a>
-			<span>›</span>
-			<a href="/contacts">Kontakte</a>
-			<span>›</span>
-			<span>Import</span>
+			<div class="breadcrumb-nav">
+				<a href="/">Home</a>
+				<span>›</span>
+				<a href="/contacts">Kontakte</a>
+				<span>›</span>
+				<span>Import</span>
+			</div>
+			<a href="/logout" class="logout-btn">
+				<span class="material-icons" style="font-size: 16px;">logout</span>
+				Abmelden
+			</a>
 		</nav>
+		<div class="container-inner">
 		<h1>vCard importieren</h1>
 	<form method="POST" enctype="multipart/form-data" id="uploadForm">
 		<div class="upload-area" onclick="document.getElementById('vcardfile').click()">
@@ -135,6 +173,8 @@
 			<button type="submit" class="btn" id="submitBtn" disabled>Importieren</button>
 		</div>
 	</form>
+	</div>
+	</div>
 
 	<script>
 		function updateFileInfo(input) {

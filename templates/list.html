@@ -40,7 +40,23 @@
 			padding: 15px 30px;
 			margin: 0;
 			border-radius: 12px 12px 0 0;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
 		}
+		.breadcrumb-nav { display: flex; align-items: center; }
+		.logout-btn {
+			background-color: #999;
+			color: white;
+			padding: 6px 12px;
+			border-radius: 4px;
+			text-decoration: none;
+			font-size: 13px;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		}
+		.logout-btn:hover { background-color: #777; }
 		.breadcrumb a { color: #667eea; text-decoration: none; }
 		.breadcrumb a:hover { text-decoration: underline; }
 		.breadcrumb span { margin: 0 5px; }
@@ -123,9 +139,15 @@
 <body>
 	<div class="container">
 		<nav class="breadcrumb">
-			<a href="/">Home</a>
-			<span>›</span>
-			<span>Kontakte</span>
+			<div class="breadcrumb-nav">
+				<a href="/">Home</a>
+				<span>›</span>
+				<span>Kontakte</span>
+			</div>
+			<a href="/logout" class="logout-btn">
+				<span class="material-icons" style="font-size: 16px;">logout</span>
+				Abmelden
+			</a>
 		</nav>
 		<div class="container-inner">
 			<div class="header">
@@ -142,10 +164,6 @@
 					Import
 				</a>
 				<a href="/contacts/new" class="btn" style="margin-right: 10px;">Neuer Kontakt</a>
-				<a href="/logout" class="btn" style="background-color: #999;">
-					<span class="material-icons" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">logout</span>
-					Abmelden
-				</a>
 			</div>
 		</div>
 		<table>
