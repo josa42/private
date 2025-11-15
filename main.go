@@ -841,67 +841,6 @@ func vCardToContact(card vcard.Card) Contact {
 	return contact
 }
 
-func webCardDAVImportHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		cardDAVURL := r.FormValue("carddavUrl")
-		username := r.FormValue("username")
-		password := r.FormValue("password")
-		addressBookPath := r.FormValue("addressBookPath")
-		groupFilter := r.FormValue("groupFilter")
-
-		if cardDAVURL == "" {
-			data := struct {
-				Error string
-			}{
-				Error: "CardDAV URL ist erforderlich",
-			}
-			templates.ExecuteTemplate(w, "carddav-import.html", data)
-			return
-		}
-
-		// Import contacts from CardDAV
-		newContacts, err := importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFilter)
-		if err != nil {
-			data := struct {
-				Error string
-			}{
-				Error: fmt.Sprintf("Fehler beim Import: %v", err),
-			}
-			templates.ExecuteTemplate(w, "carddav-import.html", data)
-			return
-		}
-
-		if len(newContacts) == 0 {
-			data := struct {
-				Error string
-			}{
-				Error: "Keine Kontakte gefunden",
-			}
-			templates.ExecuteTemplate(w, "carddav-import.html", data)
-			return
-		}
-
-		// Load existing contacts
-		existingContacts, err := loadContacts(dataDir + "/contacts.json")
-		if err != nil {
-			existingContacts = []Contact{}
-		}
-
-		// Append new contacts
-		existingContacts = append(existingContacts, newContacts...)
-
-		// Save contacts
-		if err := saveContacts(dataDir+"/contacts.json", existingContacts); err != nil {
-			http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
-			return
-		}
-
-		http.Redirect(w, r, "/contacts", http.StatusSeeOther)
-		return
-	}
-
-	templates.ExecuteTemplate(w, "carddav-import.html", nil)
-}
 
 func webCardDAVSyncHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
@@ -1127,7 +1066,6 @@ func main() {
 	mux.HandleFunc("/contacts/edit", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/new", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/import", authMiddleware(webImportHandler))
-	mux.HandleFunc("/contacts/import-carddav", authMiddleware(webCardDAVImportHandler))
 	mux.HandleFunc("/contacts/sync-carddav", authMiddleware(webCardDAVSyncHandler))
 	mux.HandleFunc("/contacts/normalize", authMiddleware(normalizeAllHandler))
 
