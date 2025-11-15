@@ -14,8 +14,9 @@
 		        border-radius: 4px; box-sizing: border-box; }
 		select { padding: 8px; margin-top: 5px; border: 1px solid #ddd; 
 		         border-radius: 4px; box-sizing: border-box; }
-		.name-fields { background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin-bottom: 10px; }
-		.or-divider { text-align: center; margin: 15px 0; color: #666; font-weight: bold; }
+		.contact-type-select { width: 100%; margin-bottom: 20px; }
+		.form-section { display: none; }
+		.form-section.active { display: block; }
 		.phone-row { display: flex; gap: 10px; margin-top: 10px; align-items: flex-start; }
 		.phone-row > div:first-child { flex: 2; }
 		.phone-row > div:last-child { flex: 1; }
@@ -43,7 +44,13 @@
 	<form method="POST" onsubmit="return validateForm()">
 		<input type="hidden" name="id" value="{{.ID}}">
 		
-		<div class="name-fields">
+		<label>Kontakttyp:</label>
+		<select id="contactType" class="contact-type-select" onchange="toggleContactType()">
+			<option value="person" {{if not .Contact.CompanyName}}selected{{end}}>Person</option>
+			<option value="company" {{if .Contact.CompanyName}}selected{{end}}>Firma</option>
+		</select>
+		
+		<div id="personFields" class="form-section">
 			<label>Vorname:</label>
 			<input type="text" id="firstName" name="firstName" value="{{.Contact.FirstName}}">
 			
@@ -51,10 +58,10 @@
 			<input type="text" id="lastName" name="lastName" value="{{.Contact.LastName}}">
 		</div>
 		
-		<div class="or-divider">ODER</div>
-		
-		<label>Firmenname:</label>
-		<input type="text" id="companyName" name="companyName" value="{{.Contact.CompanyName}}">
+		<div id="companyFields" class="form-section">
+			<label>Firmenname:</label>
+			<input type="text" id="companyName" name="companyName" value="{{.Contact.CompanyName}}">
+		</div>
 		
 		<div class="phone-row">
 			<div>
@@ -81,17 +88,48 @@
 	</form>
 
 	<script>
-		function validateForm() {
-			const firstName = document.getElementById('firstName').value.trim();
-			const lastName = document.getElementById('lastName').value.trim();
-			const companyName = document.getElementById('companyName').value.trim();
+		function toggleContactType() {
+			const contactType = document.getElementById('contactType').value;
+			const personFields = document.getElementById('personFields');
+			const companyFields = document.getElementById('companyFields');
 			
-			if (!firstName && !lastName && !companyName) {
-				alert('Bitte geben Sie entweder einen Namen (Vor-/Nachname) oder einen Firmennamen ein.');
-				return false;
+			if (contactType === 'person') {
+				personFields.classList.add('active');
+				companyFields.classList.remove('active');
+				document.getElementById('companyName').value = '';
+			} else {
+				personFields.classList.remove('active');
+				companyFields.classList.add('active');
+				document.getElementById('firstName').value = '';
+				document.getElementById('lastName').value = '';
 			}
+		}
+		
+		function validateForm() {
+			const contactType = document.getElementById('contactType').value;
+			
+			if (contactType === 'person') {
+				const firstName = document.getElementById('firstName').value.trim();
+				const lastName = document.getElementById('lastName').value.trim();
+				
+				if (!firstName && !lastName) {
+					alert('Bitte geben Sie mindestens Vor- oder Nachnamen ein.');
+					return false;
+				}
+			} else {
+				const companyName = document.getElementById('companyName').value.trim();
+				
+				if (!companyName) {
+					alert('Bitte geben Sie einen Firmennamen ein.');
+					return false;
+				}
+			}
+			
 			return true;
 		}
+		
+		// Initialize on page load
+		toggleContactType();
 	</script>
 </body>
 </html>
