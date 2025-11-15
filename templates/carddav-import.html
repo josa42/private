@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CardDAV Import</title>
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	<style>
+		* { box-sizing: border-box; }
+		body { 
+			font-family: Arial, sans-serif; 
+			margin: 0;
+			padding: 20px;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+			display: flex;
+			align-items: flex-start;
+			justify-content: center;
+			padding-top: 40px;
+		}
+		.container {
+			background: white;
+			border-radius: 12px;
+			padding: 0;
+			max-width: 680px;
+			width: 100%;
+			box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+		}
+		.container-inner { padding: 30px; }
+		.breadcrumb { 
+			margin-bottom: 0; 
+			color: #666;
+			font-size: 14px;
+			position: sticky;
+			top: 0;
+			background: white;
+			z-index: 11;
+			padding: 15px 30px;
+			margin: 0;
+			border-radius: 12px 12px 0 0;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+		.breadcrumb-nav { display: flex; align-items: center; }
+		.logout-btn {
+			background-color: transparent;
+			color: #999;
+			padding: 6px;
+			border-radius: 4px;
+			border: none;
+			cursor: pointer;
+			display: flex;
+			align-items: center;
+			gap: 4px;
+			font-size: 14px;
+			text-decoration: none;
+		}
+		.logout-btn:hover {
+			background-color: #f5f5f5;
+			color: #666;
+		}
+		.breadcrumb a { color: #667eea; text-decoration: none; }
+		.breadcrumb a:hover { text-decoration: underline; }
+		.breadcrumb span { margin: 0 5px; }
+		h1 { color: #333; margin: 0 0 20px 0; }
+		label { 
+			display: block; 
+			margin-top: 15px; 
+			font-weight: bold; 
+			color: #555;
+			margin-bottom: 5px;
+		}
+		input[type="text"],
+		input[type="password"],
+		input[type="url"] {
+			width: 100%;
+			padding: 10px;
+			border: 1px solid #ddd;
+			border-radius: 4px;
+			font-size: 14px;
+		}
+		input[type="text"]:focus,
+		input[type="password"]:focus,
+		input[type="url"]:focus {
+			outline: none;
+			border-color: #667eea;
+		}
+		.form-help {
+			font-size: 12px;
+			color: #999;
+			margin-top: 4px;
+			margin-bottom: 15px;
+		}
+		.btn {
+			background-color: #667eea;
+			color: white;
+			padding: 12px 24px;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			font-size: 14px;
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			text-decoration: none;
+		}
+		.btn:hover { background-color: #5568d3; }
+		.btn-secondary {
+			background-color: #999;
+			margin-right: 10px;
+		}
+		.btn-secondary:hover { background-color: #888; }
+		.form-buttons {
+			margin-top: 25px;
+			display: flex;
+			gap: 10px;
+		}
+		.error {
+			background-color: #fee;
+			border: 1px solid #fcc;
+			color: #c33;
+			padding: 12px;
+			border-radius: 4px;
+			margin-bottom: 20px;
+		}
+		.info-box {
+			background-color: #e7f3ff;
+			border: 1px solid #b3d9ff;
+			color: #004085;
+			padding: 15px;
+			border-radius: 4px;
+			margin-bottom: 20px;
+			font-size: 14px;
+		}
+		.info-box strong { display: block; margin-bottom: 8px; }
+		.info-box ul { margin: 8px 0; padding-left: 20px; }
+		.info-box li { margin: 4px 0; }
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="breadcrumb">
+			<div class="breadcrumb-nav">
+				<a href="/contacts">Kontakte</a>
+				<span>›</span>
+				<span>CardDAV Import</span>
+			</div>
+			<a href="/logout" class="logout-btn">
+				<span class="material-icons" style="font-size: 18px;">logout</span>
+				Abmelden
+			</a>
+		</div>
+		<div class="container-inner">
+			<h1>CardDAV Import</h1>
+			
+			{{if .Error}}
+			<div class="error">
+				<strong>Fehler:</strong> {{.Error}}
+			</div>
+			{{end}}
+			
+			<div class="info-box">
+				<strong>CardDAV Server Beispiele:</strong>
+				<ul>
+					<li><strong>Nextcloud:</strong> https://nextcloud.example.com/remote.php/dav/addressbooks/users/USERNAME/contacts/</li>
+					<li><strong>iCloud:</strong> https://contacts.icloud.com/</li>
+					<li><strong>Google:</strong> https://www.googleapis.com/carddav/v1/principals/USERNAME@gmail.com/lists/default/</li>
+					<li><strong>Radicale:</strong> https://radicale.example.com/USERNAME/addressbook/</li>
+				</ul>
+			</div>
+			
+			<form method="POST" action="/contacts/import-carddav">
+				<label for="carddavUrl">CardDAV URL *</label>
+				<input type="url" id="carddavUrl" name="carddavUrl" required 
+				       placeholder="https://nextcloud.example.com/remote.php/dav/addressbooks/users/USERNAME/contacts/">
+				<div class="form-help">Die vollständige URL zum CardDAV Adressbuch</div>
+				
+				<label for="username">Benutzername</label>
+				<input type="text" id="username" name="username" autocomplete="username"
+				       placeholder="Optional, falls Authentifizierung erforderlich">
+				
+				<label for="password">Passwort</label>
+				<input type="password" id="password" name="password" autocomplete="current-password"
+				       placeholder="Optional, falls Authentifizierung erforderlich">
+				
+				<label for="addressBookPath">Adressbuch Pfad</label>
+				<input type="text" id="addressBookPath" name="addressBookPath"
+				       placeholder="Optional, leer lassen für Auto-Discovery">
+				<div class="form-help">Nur notwendig, wenn mehrere Adressbücher vorhanden sind</div>
+				
+				<div class="form-buttons">
+					<a href="/contacts" class="btn btn-secondary">Abbrechen</a>
+					<button type="submit" class="btn">
+						<span class="material-icons" style="font-size: 18px;">cloud_download</span>
+						Importieren
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</body>
+</html>

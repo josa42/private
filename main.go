@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"embed"
@@ -13,10 +14,14 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/emersion/go-vcard"
+	"github.com/emersion/go-webdav/carddav"
 )
 
 //go:embed templates/*
@@ -458,6 +463,220 @@ func webImportHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "import.html", nil)
 }
 
+func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) ([]Contact, error) {
+	ctx := context.Background()
+	
+	// Parse and validate URL
+	parsedURL, err := url.Parse(cardDAVURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid CardDAV URL: %v", err)
+	}
+
+	// Create HTTP client with basic auth
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Create CardDAV client
+	client, err := carddav.NewClient(httpClient, cardDAVURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CardDAV client: %v", err)
+	}
+
+	// Set credentials
+	if username != "" && password != "" {
+		parsedURL.User = url.UserPassword(username, password)
+		client, err = carddav.NewClient(httpClient, parsedURL.String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create CardDAV client with auth: %v", err)
+		}
+	}
+
+	// Find address books
+	var addressBookURL string
+	if addressBookPath != "" {
+		addressBookURL = cardDAVURL
+		if !strings.HasSuffix(addressBookURL, "/") {
+			addressBookURL += "/"
+		}
+		addressBookURL += strings.TrimPrefix(addressBookPath, "/")
+	} else {
+		// Auto-discover principal and address books
+		principal, err := client.FindCurrentUserPrincipal(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find user principal: %v", err)
+		}
+
+		addressBooks, err := client.FindAddressBooks(ctx, principal)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find address books: %v", err)
+		}
+
+		if len(addressBooks) == 0 {
+			return nil, fmt.Errorf("no address books found")
+		}
+
+		// Use first address book
+		addressBookURL = addressBooks[0].Path
+	}
+
+	// Query all contacts from address book
+	query := carddav.AddressBookQuery{
+		DataRequest: carddav.AddressDataRequest{
+			AllProp: true,
+		},
+	}
+
+	addressObjects, err := client.QueryAddressBook(ctx, addressBookURL, &query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query address book: %v", err)
+	}
+
+	// Convert vCards to contacts
+	var contacts []Contact
+	for _, obj := range addressObjects {
+		if obj.Card == nil {
+			continue
+		}
+
+		contact := vCardToContact(obj.Card)
+		if contact.Phone.PhoneNumber != "" {
+			contacts = append(contacts, contact)
+		}
+	}
+
+	return contacts, nil
+}
+
+func vCardToContact(card vcard.Card) Contact {
+	contact := Contact{
+		Phone: Phone{
+			AccountIndex: 0,
+		},
+		Groups: Groups{
+			GroupID: 1,
+		},
+	}
+
+	// Get formatted name
+	fn := card.PreferredValue(vcard.FieldFormattedName)
+	if fn != "" {
+		nameParts := strings.Fields(fn)
+		if len(nameParts) >= 2 {
+			contact.FirstName = nameParts[0]
+			contact.LastName = strings.Join(nameParts[1:], " ")
+		} else if len(nameParts) == 1 {
+			contact.FirstName = nameParts[0]
+		}
+	}
+
+	// Try structured name if formatted name didn't work
+	if contact.FirstName == "" && contact.LastName == "" {
+		names := card.Names()
+		if len(names) > 0 {
+			n := names[0]
+			contact.LastName = n.FamilyName
+			contact.FirstName = n.GivenName
+		}
+	}
+
+	// Get organization
+	orgs := card.Values(vcard.FieldOrganization)
+	if len(orgs) > 0 {
+		contact.CompanyName = orgs[0]
+	}
+
+	// Get phone number (prefer mobile, then work, then any)
+	phones := card.Values(vcard.FieldTelephone)
+	var selectedPhone string
+	var phoneType string
+
+	for _, phone := range phones {
+		if phone == "" {
+			continue
+		}
+
+		// Get type parameter for this field
+		// Since we only have the value, we'll use the first phone we find
+		// and default to "cell" type
+		if selectedPhone == "" {
+			selectedPhone = phone
+			phoneType = "cell"
+		}
+	}
+
+	if selectedPhone != "" {
+		// Clean and normalize phone number
+		selectedPhone = strings.ReplaceAll(selectedPhone, " ", "")
+		selectedPhone = strings.ReplaceAll(selectedPhone, "-", "")
+		contact.Phone.PhoneNumber = selectedPhone
+		contact.Phone.Type = phoneType
+	}
+
+	return contact
+}
+
+func webCardDAVImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		cardDAVURL := r.FormValue("carddavUrl")
+		username := r.FormValue("username")
+		password := r.FormValue("password")
+		addressBookPath := r.FormValue("addressBookPath")
+
+		if cardDAVURL == "" {
+			data := struct {
+				Error string
+			}{
+				Error: "CardDAV URL ist erforderlich",
+			}
+			templates.ExecuteTemplate(w, "carddav-import.html", data)
+			return
+		}
+
+		// Import contacts from CardDAV
+		newContacts, err := importFromCardDAV(cardDAVURL, username, password, addressBookPath)
+		if err != nil {
+			data := struct {
+				Error string
+			}{
+				Error: fmt.Sprintf("Fehler beim Import: %v", err),
+			}
+			templates.ExecuteTemplate(w, "carddav-import.html", data)
+			return
+		}
+
+		if len(newContacts) == 0 {
+			data := struct {
+				Error string
+			}{
+				Error: "Keine Kontakte gefunden",
+			}
+			templates.ExecuteTemplate(w, "carddav-import.html", data)
+			return
+		}
+
+		// Load existing contacts
+		existingContacts, err := loadContacts(dataDir + "/contacts.json")
+		if err != nil {
+			existingContacts = []Contact{}
+		}
+
+		// Append new contacts
+		existingContacts = append(existingContacts, newContacts...)
+
+		// Save contacts
+		if err := saveContacts(dataDir+"/contacts.json", existingContacts); err != nil {
+			http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+		return
+	}
+
+	templates.ExecuteTemplate(w, "carddav-import.html", nil)
+}
+
 func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		action := r.FormValue("action")
@@ -629,6 +848,7 @@ func main() {
 	mux.HandleFunc("/contacts/edit", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/new", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/import", authMiddleware(webImportHandler))
+	mux.HandleFunc("/contacts/import-carddav", authMiddleware(webCardDAVImportHandler))
 	mux.HandleFunc("/contacts/normalize", authMiddleware(normalizeAllHandler))
 
 	loggedMux := loggingMiddleware(mux)
