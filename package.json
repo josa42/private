@@ -1,0 +1,28 @@
+{
+  "name": "grandstream-telephonebook",
+  "version": "1.0.0",
+  "description": "[![CI](https://github.com/josa42/grandstream-telephonebook/actions/workflows/ci.yml/badge.svg)](https://github.com/josa42/grandstream-telephonebook/actions/workflows/ci.yml) [![Release](https://github.com/josa42/grandstream-telephonebook/actions/workflows/release.yml/badge.svg)](https://github.com/josa42/grandstream-telephonebook/actions/workflows/release.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/josa42/grandstream-telephonebook)](https://goreportcard.com/report/github.com/josa42/grandstream-telephonebook)",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/josa42/private.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/josa42/private/issues"
+  },
+  "homepage": "https://github.com/josa42/private#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "playwright": "^1.56.1"
+  }
+}
