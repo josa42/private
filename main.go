@@ -578,38 +578,90 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 
 	log.Printf("CardDAV: Retrieved %d address object(s)", len(addressObjects))
 
+	// If group filter is specified, try to find group members (iCloud support)
+	var groupMemberUIDs map[string]bool
+	groupFilterLower := strings.ToLower(strings.TrimSpace(groupFilter))
+	
+	if groupFilterLower != "" {
+		log.Printf("CardDAV: Filtering contacts by group: '%s'", groupFilter)
+		
+		// First pass: Find group objects and extract member UIDs (for iCloud)
+		groupMemberUIDs = make(map[string]bool)
+		for _, obj := range addressObjects {
+			if obj.Card == nil {
+				continue
+			}
+			
+			// Check if this is a group object (iCloud uses X-ADDRESSBOOKSERVER-KIND)
+			kind := obj.Card.Value("X-ADDRESSBOOKSERVER-KIND")
+			if kind == "group" {
+				// This is a group, check if it matches our filter
+				groupName := obj.Card.PreferredValue(vcard.FieldFormattedName)
+				if groupName != "" && strings.Contains(strings.ToLower(groupName), groupFilterLower) {
+					log.Printf("CardDAV: Found iCloud group: '%s'", groupName)
+					
+					// Extract member UIDs
+					members := obj.Card.Values("X-ADDRESSBOOKSERVER-MEMBER")
+					for _, member := range members {
+						// Member format: urn:uuid:XXXX or /path/XXXX.vcf
+						memberUID := extractUIDFromMember(member)
+						if memberUID != "" {
+							groupMemberUIDs[memberUID] = true
+						}
+					}
+					log.Printf("CardDAV: Group '%s' has %d member(s)", groupName, len(groupMemberUIDs))
+				}
+			}
+		}
+	}
+
 	// Convert vCards to contacts with optional group filtering
 	var contacts []Contact
 	var filteredCount int
 	var noPhoneCount int
 	var processedCount int
-	groupFilterLower := strings.ToLower(strings.TrimSpace(groupFilter))
-	
-	if groupFilterLower != "" {
-		log.Printf("CardDAV: Filtering contacts by group: '%s'", groupFilter)
-	}
 	
 	for _, obj := range addressObjects {
 		if obj.Card == nil {
 			continue
 		}
+		
+		// Skip group objects themselves
+		kind := obj.Card.Value("X-ADDRESSBOOKSERVER-KIND")
+		if kind == "group" {
+			continue
+		}
 
 		// Check group filter if specified
 		if groupFilterLower != "" {
-			categories := obj.Card.Values(vcard.FieldCategories)
-			
-			// Debug: Log categories for first few contacts
-			if processedCount < 3 {
-				log.Printf("CardDAV: Contact has categories: %v", categories)
-			}
-			
 			matchesGroup := false
 			
-			for _, category := range categories {
-				categoryLower := strings.ToLower(strings.TrimSpace(category))
-				if categoryLower == groupFilterLower || strings.Contains(categoryLower, groupFilterLower) {
+			// Method 1: Check iCloud group membership by UID
+			if len(groupMemberUIDs) > 0 {
+				contactUID := obj.Card.Value(vcard.FieldUID)
+				if contactUID != "" && groupMemberUIDs[contactUID] {
 					matchesGroup = true
-					break
+					if processedCount < 3 {
+						log.Printf("CardDAV: Contact UID '%s' matches iCloud group", contactUID)
+					}
+				}
+			}
+			
+			// Method 2: Check standard CATEGORIES field (for Nextcloud, etc.)
+			if !matchesGroup {
+				categories := obj.Card.Values(vcard.FieldCategories)
+				
+				// Debug: Log categories for first few contacts
+				if processedCount < 3 && len(categories) > 0 {
+					log.Printf("CardDAV: Contact has categories: %v", categories)
+				}
+				
+				for _, category := range categories {
+					categoryLower := strings.ToLower(strings.TrimSpace(category))
+					if categoryLower == groupFilterLower || strings.Contains(categoryLower, groupFilterLower) {
+						matchesGroup = true
+						break
+					}
 				}
 			}
 			
@@ -644,6 +696,29 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 	}
 	log.Printf("CardDAV: Successfully converted %d contact(s) with phone numbers", len(contacts))
 	return contacts, nil
+}
+
+func extractUIDFromMember(member string) string {
+	// Member can be in format:
+	// urn:uuid:12345678-1234-1234-1234-123456789012
+	// /274887503/carddavhome/card/12345678-1234-1234-1234-123456789012.vcf
+	
+	// Extract UUID from urn:uuid: format
+	if strings.HasPrefix(member, "urn:uuid:") {
+		return strings.TrimPrefix(member, "urn:uuid:")
+	}
+	
+	// Extract UUID from path format
+	if strings.Contains(member, "/") {
+		parts := strings.Split(member, "/")
+		if len(parts) > 0 {
+			lastPart := parts[len(parts)-1]
+			// Remove .vcf extension if present
+			return strings.TrimSuffix(lastPart, ".vcf")
+		}
+	}
+	
+	return member
 }
 
 func vCardToContact(card vcard.Card) Contact {
