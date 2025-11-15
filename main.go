@@ -535,22 +535,32 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 
 		addressBooks, err := client.FindAddressBooks(ctx, principal)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find address books: %v (Principal: %s)", err, principal)
-		}
+			// iCloud workaround: construct address book path from principal
+			// Principal format: /DSID/principal/ -> Address book: /DSID/carddavhome/card/
+			if strings.Contains(principal, "/principal/") {
+				dsid := strings.Trim(principal, "/")
+				dsid = strings.Split(dsid, "/")[0]
+				addressBookURL = "/" + dsid + "/carddavhome/card/"
+				log.Printf("CardDAV: Auto-discovery failed, trying iCloud workaround with URL: %s", addressBookURL)
+				log.Printf("CardDAV: (Hinweis: Du kannst diese URL direkt als 'Adressbuch Pfad' eingeben)")
+			} else {
+				return nil, fmt.Errorf("failed to find address books: %v (Principal: %s)", err, principal)
+			}
+		} else {
+			if len(addressBooks) == 0 {
+				return nil, fmt.Errorf("no address books found (Principal: %s)", principal)
+			}
 
-		if len(addressBooks) == 0 {
-			return nil, fmt.Errorf("no address books found (Principal: %s)", principal)
-		}
+			// Log all found address books
+			log.Printf("CardDAV: Found %d address book(s):", len(addressBooks))
+			for i, ab := range addressBooks {
+				log.Printf("  [%d] %s - %s", i, ab.Name, ab.Path)
+			}
 
-		// Log all found address books
-		log.Printf("CardDAV: Found %d address book(s):", len(addressBooks))
-		for i, ab := range addressBooks {
-			log.Printf("  [%d] %s - %s", i, ab.Name, ab.Path)
+			// Use first address book
+			addressBookURL = addressBooks[0].Path
+			log.Printf("CardDAV: Using address book: %s", addressBookURL)
 		}
-
-		// Use first address book
-		addressBookURL = addressBooks[0].Path
-		log.Printf("CardDAV: Using address book: %s", addressBookURL)
 	}
 
 	// Query all contacts from address book
