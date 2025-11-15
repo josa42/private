@@ -13,8 +13,9 @@
 			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 			min-height: 100vh;
 			display: flex;
-			align-items: center;
+			align-items: flex-start;
 			justify-content: center;
+			padding-top: 40px;
 		}
 		.container {
 			background: white;
@@ -94,7 +95,7 @@
 		}
 		
 		@media (max-width: 768px) {
-			body { padding: 10px; }
+			body { padding: 10px; padding-top: 20px; }
 			.container { padding: 20px; }
 			h1 { font-size: 2em; }
 			.cards { grid-template-columns: 1fr; }
