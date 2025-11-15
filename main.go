@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -324,6 +325,13 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Sort contacts by name
+	sort.Slice(contacts, func(i, j int) bool {
+		nameI := getContactDisplayName(contacts[i])
+		nameJ := getContactDisplayName(contacts[j])
+		return strings.ToLower(nameI) < strings.ToLower(nameJ)
+	})
+
 	// Check if CardDAV config exists and has sources
 	config, _ := loadCardDAVConfig(dataDir + "/carddav-config.json")
 	hasCardDAVConfig := config != nil && len(config.Sources) > 0
@@ -337,6 +345,16 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templates.ExecuteTemplate(w, "list.html", data)
+}
+
+func getContactDisplayName(c Contact) string {
+	if c.CompanyName != "" {
+		return c.CompanyName
+	}
+	if c.FirstName != "" || c.LastName != "" {
+		return c.FirstName + " " + c.LastName
+	}
+	return c.Phone.PhoneNumber
 }
 
 func normalizePhoneNumber(phone string) string {
