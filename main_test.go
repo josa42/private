@@ -14,6 +14,10 @@ import (
 	"testing"
 )
 
+func init() {
+	dataDir = "."
+}
+
 // Test data structures
 func createTestContacts() []Contact {
 	return []Contact{

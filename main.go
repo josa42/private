@@ -61,6 +61,7 @@ type User struct {
 }
 
 var sessions = make(map[string]string) // sessionID -> username
+var dataDir string                      // directory for contacts and users files
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +79,7 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func loadUsers() ([]User, error) {
-	data, err := os.ReadFile("users.json")
+	data, err := os.ReadFile(dataDir + "/users.json")
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +249,7 @@ func saveContacts(filename string, contacts []Contact) error {
 }
 
 func addressbookHandler(w http.ResponseWriter, r *http.Request) {
-	contacts, err := loadContacts("contacts.json")
+	contacts, err := loadContacts(dataDir + "/contacts.json")
 	if err != nil {
 		log.Printf("Error loading contacts: %v", err)
 		http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
@@ -271,7 +272,7 @@ func addressbookHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func webListHandler(w http.ResponseWriter, r *http.Request) {
-	contacts, err := loadContacts("contacts.json")
+	contacts, err := loadContacts(dataDir + "/contacts.json")
 	if err != nil {
 		http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
 		return
@@ -338,7 +339,7 @@ func normalizePhoneNumber(phone string) string {
 }
 
 func normalizeAllHandler(w http.ResponseWriter, r *http.Request) {
-	contacts, err := loadContacts("contacts.json")
+	contacts, err := loadContacts(dataDir + "/contacts.json")
 	if err != nil {
 		http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
 		return
@@ -349,7 +350,7 @@ func normalizeAllHandler(w http.ResponseWriter, r *http.Request) {
 		contacts[i].Phone.PhoneNumber = normalizePhoneNumber(contacts[i].Phone.PhoneNumber)
 	}
 
-	if err := saveContacts("contacts.json", contacts); err != nil {
+	if err := saveContacts(dataDir+"/contacts.json", contacts); err != nil {
 		http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
 		return
 	}
@@ -438,14 +439,14 @@ func webImportHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		existingContacts, err := loadContacts("contacts.json")
+		existingContacts, err := loadContacts(dataDir + "/contacts.json")
 		if err != nil {
 			existingContacts = []Contact{}
 		}
 
 		existingContacts = append(existingContacts, newContacts...)
 
-		if err := saveContacts("contacts.json", existingContacts); err != nil {
+		if err := saveContacts(dataDir+"/contacts.json", existingContacts); err != nil {
 			http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
 			return
 		}
@@ -462,7 +463,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		action := r.FormValue("action")
 		
 		if action == "delete" {
-			contacts, err := loadContacts("contacts.json")
+			contacts, err := loadContacts(dataDir + "/contacts.json")
 			if err != nil {
 				http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
 				return
@@ -473,7 +474,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 				id, _ := strconv.Atoi(idStr)
 				if id >= 0 && id < len(contacts) {
 					contacts = append(contacts[:id], contacts[id+1:]...)
-					if err := saveContacts("contacts.json", contacts); err != nil {
+					if err := saveContacts(dataDir+"/contacts.json", contacts); err != nil {
 						http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
 						return
 					}
@@ -483,7 +484,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		contacts, err := loadContacts("contacts.json")
+		contacts, err := loadContacts(dataDir + "/contacts.json")
 		if err != nil {
 			http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
 			return
@@ -519,7 +520,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if err := saveContacts("contacts.json", contacts); err != nil {
+		if err := saveContacts(dataDir+"/contacts.json", contacts); err != nil {
 			http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
 			return
 		}
@@ -533,7 +534,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	isNew := idStr == ""
 
 	if !isNew {
-		contacts, err := loadContacts("contacts.json")
+		contacts, err := loadContacts(dataDir + "/contacts.json")
 		if err != nil {
 			http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
 			return
@@ -597,7 +598,7 @@ func addUser(credentials string) error {
 		return fmt.Errorf("failed to marshal users: %v", err)
 	}
 
-	if err := os.WriteFile("users.json", data, 0600); err != nil {
+	if err := os.WriteFile(dataDir+"/users.json", data, 0600); err != nil {
 		return fmt.Errorf("failed to write users.json: %v", err)
 	}
 
@@ -606,7 +607,10 @@ func addUser(credentials string) error {
 
 func main() {
 	addUserFlag := flag.String("add-user", "", "Add a new user (format: username:password)")
+	dataDirFlag := flag.String("data-dir", ".", "Directory for contacts and users files (default: current directory)")
 	flag.Parse()
+
+	dataDir = *dataDirFlag
 
 	if *addUserFlag != "" {
 		if err := addUser(*addUserFlag); err != nil {
