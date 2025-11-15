@@ -77,8 +77,8 @@
 		a:hover { text-decoration: underline; }
 		.delete-link { color: #f44336; }
 		.action-icon { vertical-align: middle; font-size: 18px; }
-		.actions { white-space: nowrap; }
-		.actions a { display: inline-flex; align-items: center; margin-right: 12px; }
+		.actions { white-space: nowrap; text-align: right; }
+		.actions a { display: inline-flex; align-items: center; margin-left: 12px; }
 		.btn { 
 			background-color: #667eea; 
 			color: white; 
@@ -115,7 +115,7 @@
 			.btn { padding: 8px 12px; font-size: 13px; justify-content: center; }
 			.btn .material-icons { font-size: 16px; }
 			th, td { padding: 6px 4px; font-size: 13px; }
-			.actions a { margin-right: 8px; }
+			.actions a { margin-left: 8px; }
 			.action-icon { font-size: 20px; }
 		}
 	</style>
@@ -148,7 +148,7 @@
 			<tr>
 				<th>Name</th>
 				<th>Telefonnummer</th>
-				<th style="width: 120px;">Aktionen</th>
+				<th style="width: 80px;">Aktionen</th>
 			</tr>
 			{{range $i, $c := .}}
 			<tr onclick="window.location='/contacts/edit?id={{$i}}'">
