@@ -6,31 +6,97 @@
 	<title>vCard importieren</title>
 	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 	<style>
-		body { font-family: Arial, sans-serif; margin: 20px; max-width: 600px; }
-		.breadcrumb { margin-bottom: 20px; color: #666; }
-		.breadcrumb a { color: #4CAF50; text-decoration: none; }
+		* { box-sizing: border-box; }
+		body { 
+			font-family: Arial, sans-serif; 
+			margin: 0;
+			padding: 20px;
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			min-height: 100vh;
+		}
+		.container {
+			background: white;
+			border-radius: 12px;
+			padding: 30px;
+			max-width: 680px;
+			margin: 0 auto;
+			box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+		}
+		.breadcrumb { 
+			margin-bottom: 20px; 
+			color: #666;
+			font-size: 14px;
+		}
+		.breadcrumb a { color: #667eea; text-decoration: none; }
 		.breadcrumb a:hover { text-decoration: underline; }
 		.breadcrumb span { margin: 0 5px; }
-		.upload-area { border: 2px dashed #ddd; border-radius: 8px; padding: 40px; 
-		               text-align: center; margin: 20px 0; background-color: #f9f9f9; }
-		.upload-area:hover { border-color: #4CAF50; background-color: #f0f8f0; }
-		.upload-icon { font-size: 48px; color: #4CAF50; margin-bottom: 16px; }
+		h1 { color: #333; margin: 0 0 20px 0; }
+		.upload-area { 
+			border: 2px dashed #ddd; 
+			border-radius: 8px; 
+			padding: 40px; 
+			text-align: center; 
+			margin: 20px 0; 
+			background-color: #f9f9f9;
+		}
+		.upload-area:hover { 
+			border-color: #667eea; 
+			background-color: #f0f4ff;
+		}
+		.upload-icon { 
+			font-size: 48px; 
+			color: #667eea; 
+			margin-bottom: 16px;
+		}
 		input[type="file"] { display: none; }
-		.file-label { color: #4CAF50; cursor: pointer; text-decoration: underline; }
-		.file-label:hover { color: #45a049; }
-		.btn { background-color: #4CAF50; color: white; padding: 10px 20px; 
-		       border: none; border-radius: 4px; cursor: pointer; }
-		.btn:hover { background-color: #45a049; }
-		.btn:disabled { background-color: #ccc; cursor: not-allowed; }
-		.cancel { background-color: #999; margin-right: 10px; text-decoration: none;
-		          display: inline-block; padding: 10px 20px; color: white; border-radius: 4px; }
+		.file-label { 
+			color: #667eea; 
+			cursor: pointer; 
+			text-decoration: underline;
+		}
+		.file-label:hover { color: #5568d3; }
+		.btn { 
+			background-color: #667eea; 
+			color: white; 
+			padding: 10px 20px; 
+			border: none; 
+			border-radius: 4px; 
+			cursor: pointer;
+			font-size: 14px;
+		}
+		.btn:hover { background-color: #5568d3; }
+		.btn:disabled { 
+			background-color: #ccc; 
+			cursor: not-allowed;
+		}
+		.cancel { 
+			background-color: #999; 
+			margin-right: 10px; 
+			text-decoration: none;
+			display: inline-block; 
+			padding: 10px 20px; 
+			color: white; 
+			border-radius: 4px;
+			font-size: 14px;
+		}
 		.cancel:hover { background-color: #888; }
-		.form-buttons { margin-top: 20px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
-		.file-info { margin-top: 10px; color: #666; font-size: 14px; }
+		.form-buttons { 
+			margin-top: 20px; 
+			display: flex; 
+			justify-content: flex-end; 
+			align-items: center; 
+			gap: 10px;
+		}
+		.file-info { 
+			margin-top: 10px; 
+			color: #666; 
+			font-size: 14px;
+		}
 		
 		@media (max-width: 768px) {
-			body { margin: 10px; max-width: 100%; }
-			.breadcrumb { font-size: 14px; overflow-x: auto; white-space: nowrap; }
+			body { padding: 10px; }
+			.container { padding: 15px; max-width: 100%; }
+			.breadcrumb { font-size: 12px; overflow-x: auto; white-space: nowrap; }
 			h1 { font-size: 1.5em; }
 			.upload-area { padding: 30px 20px; }
 			.upload-icon { font-size: 36px; }
@@ -40,14 +106,15 @@
 	</style>
 </head>
 <body>
-	<nav class="breadcrumb">
-		<a href="/">Home</a>
-		<span>›</span>
-		<a href="/contacts">Kontakte</a>
-		<span>›</span>
-		<span>Import</span>
-	</nav>
-	<h1>vCard importieren</h1>
+	<div class="container">
+		<nav class="breadcrumb">
+			<a href="/">Home</a>
+			<span>›</span>
+			<a href="/contacts">Kontakte</a>
+			<span>›</span>
+			<span>Import</span>
+		</nav>
+		<h1>vCard importieren</h1>
 	<form method="POST" enctype="multipart/form-data" id="uploadForm">
 		<div class="upload-area" onclick="document.getElementById('vcardfile').click()">
 			<span class="material-icons upload-icon">cloud_upload</span>
@@ -109,5 +176,6 @@
 			}
 		});
 	</script>
+	</div>
 </body>
 </html>
