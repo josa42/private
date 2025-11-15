@@ -581,7 +581,13 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 	// Convert vCards to contacts with optional group filtering
 	var contacts []Contact
 	var filteredCount int
+	var noPhoneCount int
+	var processedCount int
 	groupFilterLower := strings.ToLower(strings.TrimSpace(groupFilter))
+	
+	if groupFilterLower != "" {
+		log.Printf("CardDAV: Filtering contacts by group: '%s'", groupFilter)
+	}
 	
 	for _, obj := range addressObjects {
 		if obj.Card == nil {
@@ -591,6 +597,12 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 		// Check group filter if specified
 		if groupFilterLower != "" {
 			categories := obj.Card.Values(vcard.FieldCategories)
+			
+			// Debug: Log categories for first few contacts
+			if processedCount < 3 {
+				log.Printf("CardDAV: Contact has categories: %v", categories)
+			}
+			
 			matchesGroup := false
 			
 			for _, category := range categories {
@@ -607,14 +619,28 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 			}
 		}
 
+		processedCount++
 		contact := vCardToContact(obj.Card)
 		if contact.Phone.PhoneNumber != "" {
 			contacts = append(contacts, contact)
+		} else {
+			noPhoneCount++
+			// Debug: Log contact name without phone
+			if noPhoneCount <= 5 {
+				name := contact.FirstName + " " + contact.LastName
+				if name == " " {
+					name = contact.CompanyName
+				}
+				log.Printf("CardDAV: Contact '%s' has no phone number, skipping", name)
+			}
 		}
 	}
 
 	if groupFilterLower != "" {
-		log.Printf("CardDAV: Filtered out %d contact(s) not matching group '%s'", filteredCount, groupFilter)
+		log.Printf("CardDAV: Group filter results: %d matched group, %d filtered out", processedCount, filteredCount)
+	}
+	if noPhoneCount > 0 {
+		log.Printf("CardDAV: Skipped %d contact(s) without phone numbers", noPhoneCount)
 	}
 	log.Printf("CardDAV: Successfully converted %d contact(s) with phone numbers", len(contacts))
 	return contacts, nil
