@@ -66,7 +66,12 @@ func loggingMiddleware(next http.Handler) http.Handler {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Hello, World!\n")
+	data := struct {
+		Host string
+	}{
+		Host: r.Host,
+	}
+	templates.ExecuteTemplate(w, "home.html", data)
 }
 
 func loadContacts(filename string) ([]Contact, error) {
