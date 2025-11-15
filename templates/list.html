@@ -3,6 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Kontakte</title>
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 	<style>
 		body { font-family: Arial, sans-serif; margin: 20px; }
 		.breadcrumb { margin-bottom: 20px; color: #666; }
@@ -19,6 +20,9 @@
 		a:hover { text-decoration: underline; }
 		.delete-link { color: #f44336; }
 		.delete-link:hover { text-decoration: underline; }
+		.action-icon { vertical-align: middle; font-size: 18px; margin-right: 4px; }
+		.actions { white-space: nowrap; }
+		.actions a { display: inline-flex; align-items: center; margin-right: 12px; }
 		.btn { background-color: #4CAF50; color: white; padding: 10px 20px; 
 		       border: none; border-radius: 4px; cursor: pointer; text-decoration: none;
 		       display: inline-block; }
@@ -40,17 +44,20 @@
 			<th>Vorname</th>
 			<th>Nachname</th>
 			<th>Telefonnummer</th>
-			<th style="width: 150px;">Aktionen</th>
+			<th style="width: 120px;">Aktionen</th>
 		</tr>
 		{{range $i, $c := .}}
 		<tr onclick="window.location='/contacts/edit?id={{$i}}'">
 			<td>{{$c.FirstName}}</td>
 			<td>{{$c.LastName}}</td>
 			<td>{{$c.Phone.PhoneNumber}}</td>
-			<td>
-				<a href="/contacts/edit?id={{$i}}" onclick="event.stopPropagation()">Bearbeiten</a>
-				·
-				<a href="#" class="delete-link" onclick="event.stopPropagation(); if(confirm('Kontakt wirklich löschen?')) { var form = document.createElement('form'); form.method = 'POST'; form.action = '/contacts/edit'; var idInput = document.createElement('input'); idInput.type = 'hidden'; idInput.name = 'id'; idInput.value = '{{$i}}'; var actionInput = document.createElement('input'); actionInput.type = 'hidden'; actionInput.name = 'action'; actionInput.value = 'delete'; form.appendChild(idInput); form.appendChild(actionInput); document.body.appendChild(form); form.submit(); } return false;">Löschen</a>
+			<td class="actions">
+				<a href="/contacts/edit?id={{$i}}" onclick="event.stopPropagation()" title="Bearbeiten">
+					<span class="material-icons action-icon">edit</span>
+				</a>
+				<a href="#" class="delete-link" onclick="event.stopPropagation(); if(confirm('Kontakt wirklich löschen?')) { var form = document.createElement('form'); form.method = 'POST'; form.action = '/contacts/edit'; var idInput = document.createElement('input'); idInput.type = 'hidden'; idInput.name = 'id'; idInput.value = '{{$i}}'; var actionInput = document.createElement('input'); actionInput.type = 'hidden'; actionInput.name = 'action'; actionInput.value = 'delete'; form.appendChild(idInput); form.appendChild(actionInput); document.body.appendChild(form); form.submit(); } return false;" title="Löschen">
+					<span class="material-icons action-icon">delete</span>
+				</a>
 			</td>
 		</tr>
 		{{end}}
