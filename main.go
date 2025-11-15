@@ -504,20 +504,29 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) (
 		// Auto-discover principal and address books
 		principal, err := client.FindCurrentUserPrincipal(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find user principal: %v", err)
+			return nil, fmt.Errorf("failed to find user principal: %v (Hinweis: Bei iCloud brauchst du ein App-spezifisches Passwort von https://appleid.apple.com)", err)
 		}
+
+		log.Printf("CardDAV: Found principal: %s", principal)
 
 		addressBooks, err := client.FindAddressBooks(ctx, principal)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find address books: %v", err)
+			return nil, fmt.Errorf("failed to find address books: %v (Principal: %s)", err, principal)
 		}
 
 		if len(addressBooks) == 0 {
-			return nil, fmt.Errorf("no address books found")
+			return nil, fmt.Errorf("no address books found (Principal: %s)", principal)
+		}
+
+		// Log all found address books
+		log.Printf("CardDAV: Found %d address book(s):", len(addressBooks))
+		for i, ab := range addressBooks {
+			log.Printf("  [%d] %s - %s", i, ab.Name, ab.Path)
 		}
 
 		// Use first address book
 		addressBookURL = addressBooks[0].Path
+		log.Printf("CardDAV: Using address book: %s", addressBookURL)
 	}
 
 	// Query all contacts from address book
@@ -527,10 +536,13 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) (
 		},
 	}
 
+	log.Printf("CardDAV: Querying contacts from: %s", addressBookURL)
 	addressObjects, err := client.QueryAddressBook(ctx, addressBookURL, &query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query address book: %v", err)
+		return nil, fmt.Errorf("failed to query address book: %v (URL: %s)", err, addressBookURL)
 	}
+
+	log.Printf("CardDAV: Retrieved %d address object(s)", len(addressObjects))
 
 	// Convert vCards to contacts
 	var contacts []Contact
@@ -545,6 +557,7 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) (
 		}
 	}
 
+	log.Printf("CardDAV: Successfully converted %d contact(s) with phone numbers", len(contacts))
 	return contacts, nil
 }
 
