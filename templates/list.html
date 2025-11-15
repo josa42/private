@@ -47,15 +47,21 @@
 	</div>
 	<table>
 		<tr>
-			<th>Vorname</th>
-			<th>Nachname</th>
+			<th>Name</th>
 			<th>Telefonnummer</th>
 			<th style="width: 120px;">Aktionen</th>
 		</tr>
 		{{range $i, $c := .}}
 		<tr onclick="window.location='/contacts/edit?id={{$i}}'">
-			<td>{{if $c.FirstName}}{{$c.FirstName}}{{else}}-{{end}}</td>
-			<td>{{if $c.LastName}}{{$c.LastName}}{{else}}-{{end}}</td>
+			<td>
+				{{if $c.CompanyName}}
+					<strong>{{$c.CompanyName}}</strong>
+				{{else if $c.FirstName}}
+					{{$c.FirstName}} {{$c.LastName}}
+				{{else}}
+					-
+				{{end}}
+			</td>
 			<td>{{$c.Phone.PhoneNumber}}</td>
 			<td class="actions">
 				<a href="/contacts/edit?id={{$i}}" onclick="event.stopPropagation()" title="Bearbeiten">

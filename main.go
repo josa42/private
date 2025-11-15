@@ -37,11 +37,12 @@ type Groups struct {
 }
 
 type Contact struct {
-	XMLName   xml.Name `xml:"Contact" json:"-"`
-	LastName  string   `xml:"LastName,omitempty" json:"lastName,omitempty"`
-	FirstName string   `xml:"FirstName,omitempty" json:"firstName,omitempty"`
-	Phone     Phone    `xml:"Phone" json:"phone"`
-	Groups    Groups   `xml:"Groups" json:"groups"`
+	XMLName     xml.Name `xml:"Contact" json:"-"`
+	LastName    string   `xml:"LastName,omitempty" json:"lastName,omitempty"`
+	FirstName   string   `xml:"FirstName,omitempty" json:"firstName,omitempty"`
+	CompanyName string   `xml:"Company,omitempty" json:"companyName,omitempty"`
+	Phone       Phone    `xml:"Phone" json:"phone"`
+	Groups      Groups   `xml:"Groups" json:"groups"`
 }
 
 type AddressBook struct {
@@ -274,12 +275,14 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		idStr := r.FormValue("id")
 		firstName := r.FormValue("firstName")
 		lastName := r.FormValue("lastName")
+		companyName := r.FormValue("companyName")
 		phoneNumber := r.FormValue("phoneNumber")
 		phoneType := r.FormValue("phoneType")
 
 		contact := Contact{
-			FirstName: firstName,
-			LastName:  lastName,
+			FirstName:   firstName,
+			LastName:    lastName,
+			CompanyName: companyName,
 			Phone: Phone{
 				Type:         phoneType,
 				PhoneNumber:  phoneNumber,

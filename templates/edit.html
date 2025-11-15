@@ -14,6 +14,8 @@
 		        border-radius: 4px; box-sizing: border-box; }
 		select { padding: 8px; margin-top: 5px; border: 1px solid #ddd; 
 		         border-radius: 4px; box-sizing: border-box; }
+		.name-fields { background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin-bottom: 10px; }
+		.or-divider { text-align: center; margin: 15px 0; color: #666; font-weight: bold; }
 		.phone-row { display: flex; gap: 10px; margin-top: 10px; align-items: flex-start; }
 		.phone-row > div:first-child { flex: 2; }
 		.phone-row > div:last-child { flex: 1; }
@@ -35,17 +37,24 @@
 		<span>›</span>
 		<a href="/contacts">Kontakte</a>
 		<span>›</span>
-		<span>{{if .IsNew}}Neuer Kontakt{{else}}{{if .Contact.FirstName}}{{.Contact.FirstName}} {{.Contact.LastName}}{{else}}{{.Contact.Phone.PhoneNumber}}{{end}}{{end}}</span>
+		<span>{{if .IsNew}}Neuer Kontakt{{else}}{{if .Contact.CompanyName}}{{.Contact.CompanyName}}{{else if .Contact.FirstName}}{{.Contact.FirstName}} {{.Contact.LastName}}{{else}}{{.Contact.Phone.PhoneNumber}}{{end}}{{end}}</span>
 	</nav>
 	<h1>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</h1>
-	<form method="POST">
+	<form method="POST" onsubmit="return validateForm()">
 		<input type="hidden" name="id" value="{{.ID}}">
 		
-		<label>Vorname:</label>
-		<input type="text" name="firstName" value="{{.Contact.FirstName}}">
+		<div class="name-fields">
+			<label>Vorname:</label>
+			<input type="text" id="firstName" name="firstName" value="{{.Contact.FirstName}}">
+			
+			<label>Nachname:</label>
+			<input type="text" id="lastName" name="lastName" value="{{.Contact.LastName}}">
+		</div>
 		
-		<label>Nachname:</label>
-		<input type="text" name="lastName" value="{{.Contact.LastName}}">
+		<div class="or-divider">ODER</div>
+		
+		<label>Firmenname:</label>
+		<input type="text" id="companyName" name="companyName" value="{{.Contact.CompanyName}}">
 		
 		<div class="phone-row">
 			<div>
@@ -70,5 +79,19 @@
 			<button type="submit" class="btn">Speichern</button>
 		</div>
 	</form>
+
+	<script>
+		function validateForm() {
+			const firstName = document.getElementById('firstName').value.trim();
+			const lastName = document.getElementById('lastName').value.trim();
+			const companyName = document.getElementById('companyName').value.trim();
+			
+			if (!firstName && !lastName && !companyName) {
+				alert('Bitte geben Sie entweder einen Namen (Vor-/Nachname) oder einen Firmennamen ein.');
+				return false;
+			}
+			return true;
+		}
+	</script>
 </body>
 </html>
