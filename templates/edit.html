@@ -67,8 +67,8 @@
 			<div>
 				<label>Telefonnummer:</label>
 				<input type="tel" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}" 
-				       pattern="[\d\s\+\-/()]+" 
-				       title="Nur Ziffern, Leerzeichen und +, -, /, () erlaubt"
+				       pattern="^[\d\s\+\-/()]+$" 
+				       title="Nur Ziffern, Leerzeichen und die Zeichen + - / ( ) sind erlaubt"
 				       required>
 			</div>
 			<div>
