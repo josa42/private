@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  grandstream-telephonebook:
+    build: .
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./contacts.json:/app/contacts.json
+      - ./users.json:/app/users.json
+    restart: unless-stopped

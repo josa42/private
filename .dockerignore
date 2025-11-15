@@ -1,0 +1,6 @@
+.git
+.gitignore
+*.log
+grandstream-telephonebook
+Dockerfile
+README.md
