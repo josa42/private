@@ -52,6 +52,7 @@ type Contact struct {
 	CompanyName string   `xml:"Company,omitempty" json:"companyName,omitempty"`
 	Phone       Phone    `xml:"Phone" json:"phone"`
 	Groups      Groups   `xml:"Groups" json:"groups"`
+	Source      string   `xml:"-" json:"source,omitempty"` // e.g. "carddav:iCloud Familie"
 }
 
 type CardDAVSource struct {
@@ -862,11 +863,20 @@ func webCardDAVSyncHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("CardDAV Sync: Starting sync from %d source(s)", len(config.Sources))
 
-	// Load existing contacts
+	// Load existing contacts (keep only non-synced contacts)
 	existingContacts, err := loadContacts(dataDir + "/contacts.json")
 	if err != nil {
 		existingContacts = []Contact{}
 	}
+
+	// Remove old synced contacts (they will be re-synced)
+	var manualContacts []Contact
+	for _, c := range existingContacts {
+		if c.Source == "" {
+			manualContacts = append(manualContacts, c)
+		}
+	}
+	log.Printf("CardDAV Sync: Keeping %d manually created contact(s)", len(manualContacts))
 
 	totalImported := 0
 
@@ -880,13 +890,19 @@ func webCardDAVSyncHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// Mark contacts with source
+		sourceName := fmt.Sprintf("carddav:%s", source.Name)
+		for i := range newContacts {
+			newContacts[i].Source = sourceName
+		}
+
 		log.Printf("CardDAV Sync: Imported %d contact(s) from '%s'", len(newContacts), source.Name)
-		existingContacts = append(existingContacts, newContacts...)
+		manualContacts = append(manualContacts, newContacts...)
 		totalImported += len(newContacts)
 	}
 
-	// Save all contacts
-	if err := saveContacts(dataDir+"/contacts.json", existingContacts); err != nil {
+	// Save all contacts (manual + newly synced)
+	if err := saveContacts(dataDir+"/contacts.json", manualContacts); err != nil {
 		http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
 		return
 	}
@@ -910,6 +926,11 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 			if idStr != "" {
 				id, _ := strconv.Atoi(idStr)
 				if id >= 0 && id < len(contacts) {
+					// Prevent deleting synced contacts
+					if contacts[id].Source != "" {
+						http.Error(w, "Cannot delete synced contact. This contact is managed by CardDAV sync.", http.StatusForbidden)
+						return
+					}
 					contacts = append(contacts[:id], contacts[id+1:]...)
 					if err := saveContacts(dataDir+"/contacts.json", contacts); err != nil {
 						http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
@@ -949,10 +970,17 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if idStr == "" {
+			// New contact - always allowed
 			contacts = append(contacts, contact)
 		} else {
+			// Edit existing contact
 			id, _ := strconv.Atoi(idStr)
 			if id >= 0 && id < len(contacts) {
+				// Prevent editing synced contacts
+				if contacts[id].Source != "" {
+					http.Error(w, "Cannot edit synced contact. This contact is managed by CardDAV sync.", http.StatusForbidden)
+					return
+				}
 				contacts[id] = contact
 			}
 		}
@@ -979,6 +1007,11 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(idStr)
 		if id >= 0 && id < len(contacts) {
 			contact = contacts[id]
+			// Prevent editing synced contacts
+			if contact.Source != "" {
+				http.Error(w, "Cannot edit synced contact. This contact is managed by CardDAV sync.", http.StatusForbidden)
+				return
+			}
 		}
 	}
 

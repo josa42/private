@@ -184,7 +184,7 @@
 				<th style="width: 90px;">Aktionen</th>
 			</tr>
 			{{range $i, $c := .Contacts}}
-			<tr onclick="window.location='/contacts/edit?id={{$i}}'">
+			<tr{{if not $c.Source}} onclick="window.location='/contacts/edit?id={{$i}}'"{{end}}{{if $c.Source}} style="cursor: default;"{{end}}>>
 				<td>
 					{{if $c.CompanyName}}
 						<strong>{{$c.CompanyName}}</strong>
@@ -193,15 +193,22 @@
 					{{else}}
 						-
 					{{end}}
+					{{if $c.Source}}
+						<span style="font-size: 11px; color: #999; margin-left: 8px;">🔄 synced</span>
+					{{end}}
 				</td>
 				<td>{{$c.Phone.PhoneNumber}}</td>
 				<td class="actions">
+					{{if not $c.Source}}
 					<a href="/contacts/edit?id={{$i}}" onclick="event.stopPropagation()" title="Bearbeiten">
 						<span class="material-icons action-icon">edit</span>
 					</a>
 					<a href="#" class="delete-link" onclick="event.stopPropagation(); if(confirm('Kontakt wirklich löschen?')) { var form = document.createElement('form'); form.method = 'POST'; form.action = '/contacts/edit'; var idInput = document.createElement('input'); idInput.type = 'hidden'; idInput.name = 'id'; idInput.value = '{{$i}}'; var actionInput = document.createElement('input'); actionInput.type = 'hidden'; actionInput.name = 'action'; actionInput.value = 'delete'; form.appendChild(idInput); form.appendChild(actionInput); document.body.appendChild(form); form.submit(); } return false;" title="Löschen">
 						<span class="material-icons action-icon">delete</span>
 					</a>
+					{{else}}
+					<span style="font-size: 11px; color: #999;">read-only</span>
+					{{end}}
 				</td>
 			</tr>
 			{{end}}
