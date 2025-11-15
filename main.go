@@ -557,7 +557,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler)
+	mux.HandleFunc("/", authMiddleware(handler))
 	mux.HandleFunc("/phonebook.xml", addressbookHandler)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", logoutHandler)

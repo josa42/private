@@ -20,10 +20,32 @@
 		.container {
 			background: white;
 			border-radius: 12px;
-			padding: 40px;
+			padding: 0;
 			max-width: 600px;
 			width: 100%;
 			box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+		}
+		.container-inner { padding: 40px; }
+		.header-bar {
+			display: flex;
+			justify-content: flex-end;
+			padding: 15px 20px;
+			border-radius: 12px 12px 0 0;
+			background: white;
+		}
+		.logout-btn {
+			background-color: transparent;
+			color: #999;
+			padding: 6px;
+			border-radius: 4px;
+			text-decoration: none;
+			display: flex;
+			align-items: center;
+			transition: color 0.2s, background-color 0.2s;
+		}
+		.logout-btn:hover { 
+			background-color: #f5f5f5;
+			color: #666;
 		}
 		h1 {
 			color: #333;
@@ -96,7 +118,9 @@
 		
 		@media (max-width: 768px) {
 			body { padding: 0; padding-top: 0; background: white; }
-			.container { padding: 20px; border-radius: 0; box-shadow: none; }
+			.container { padding: 0; border-radius: 0; box-shadow: none; }
+			.container-inner { padding: 20px; }
+			.header-bar { padding: 10px 15px; border-radius: 0; }
 			h1 { font-size: 2em; }
 			.cards { grid-template-columns: 1fr; }
 		}
@@ -104,6 +128,12 @@
 </head>
 <body>
 	<div class="container">
+		<div class="header-bar">
+			<a href="/logout" class="logout-btn" title="Abmelden">
+				<span class="material-icons" style="font-size: 20px;">logout</span>
+			</a>
+		</div>
+		<div class="container-inner">
 		<h1>📞 Telefonbuch</h1>
 		<p class="subtitle">Grandstream IP-Telefon Verwaltung</p>
 		
@@ -136,6 +166,7 @@
 			<p style="margin-top: 15px; font-size: 0.9em;">
 				<strong>Einstellung:</strong> Web → Settings → Phonebook → XML Phonebook → Download Interval
 			</p>
+		</div>
 		</div>
 	</div>
 </body>
