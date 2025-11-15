@@ -477,34 +477,58 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) (
 		Timeout: 30 * time.Second,
 	}
 
-	// Create CardDAV client
+	// Set credentials
+	if username != "" && password != "" {
+		// iCloud app-specific passwords can be with or without dashes
+		// Try original password first, then without dashes
+		passwords := []string{password}
+		if strings.Contains(password, "-") {
+			passwordNoDashes := strings.ReplaceAll(password, "-", "")
+			passwords = append(passwords, passwordNoDashes)
+		}
+
+		var lastErr error
+		for i, pwd := range passwords {
+			parsedURL.User = url.UserPassword(username, pwd)
+			client, err := carddav.NewClient(httpClient, parsedURL.String())
+			if err != nil {
+				lastErr = fmt.Errorf("failed to create CardDAV client: %v", err)
+				continue
+			}
+
+			// Try to find principal to test authentication
+			_, err = client.FindCurrentUserPrincipal(ctx)
+			if err == nil {
+				// Success! Continue with this password
+				log.Printf("CardDAV: Authentication successful (password variant %d)", i+1)
+				return importFromCardDAVWithClient(ctx, client, addressBookPath)
+			}
+			lastErr = err
+			log.Printf("CardDAV: Authentication failed with password variant %d: %v", i+1, err)
+		}
+
+		return nil, fmt.Errorf("authentication failed: %v (Hinweis: Bei iCloud brauchst du ein App-spezifisches Passwort von https://appleid.apple.com. Probiere das Passwort mit UND ohne Bindestriche)", lastErr)
+	}
+
+	// No credentials - try anonymous
 	client, err := carddav.NewClient(httpClient, cardDAVURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CardDAV client: %v", err)
 	}
 
-	// Set credentials
-	if username != "" && password != "" {
-		parsedURL.User = url.UserPassword(username, password)
-		client, err = carddav.NewClient(httpClient, parsedURL.String())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create CardDAV client with auth: %v", err)
-		}
-	}
+	return importFromCardDAVWithClient(ctx, client, addressBookPath)
+}
 
+func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, addressBookPath string) ([]Contact, error) {
 	// Find address books
 	var addressBookURL string
 	if addressBookPath != "" {
-		addressBookURL = cardDAVURL
-		if !strings.HasSuffix(addressBookURL, "/") {
-			addressBookURL += "/"
-		}
-		addressBookURL += strings.TrimPrefix(addressBookPath, "/")
+		addressBookURL = addressBookPath
 	} else {
 		// Auto-discover principal and address books
 		principal, err := client.FindCurrentUserPrincipal(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find user principal: %v (Hinweis: Bei iCloud brauchst du ein App-spezifisches Passwort von https://appleid.apple.com)", err)
+			return nil, fmt.Errorf("failed to find user principal: %v", err)
 		}
 
 		log.Printf("CardDAV: Found principal: %s", principal)
