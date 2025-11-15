@@ -79,6 +79,22 @@ func loadContacts(filename string) ([]Contact, error) {
 		return nil, err
 	}
 
+	// Set default type for contacts without type
+	for i := range contacts {
+		if contacts[i].Phone.Type == "" {
+			contacts[i].Phone.Type = "cell"
+		}
+		// Migrate old values to lowercase
+		switch contacts[i].Phone.Type {
+		case "Mobile":
+			contacts[i].Phone.Type = "cell"
+		case "Work":
+			contacts[i].Phone.Type = "work"
+		case "Home":
+			contacts[i].Phone.Type = "home"
+		}
+	}
+
 	return contacts, nil
 }
 
