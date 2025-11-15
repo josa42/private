@@ -54,6 +54,19 @@ type Contact struct {
 	Groups      Groups   `xml:"Groups" json:"groups"`
 }
 
+type CardDAVSource struct {
+	Name            string `json:"name"`
+	URL             string `json:"url"`
+	Username        string `json:"username"`
+	Password        string `json:"password"`
+	AddressBookPath string `json:"addressBookPath,omitempty"`
+	GroupFilter     string `json:"groupFilter,omitempty"`
+}
+
+type CardDAVConfig struct {
+	Sources []CardDAVSource `json:"sources"`
+}
+
 type AddressBook struct {
 	XMLName  xml.Name  `xml:"AddressBook" json:"-"`
 	Contacts []Contact `xml:"Contact" json:"-"`
@@ -243,6 +256,33 @@ func loadContacts(filename string) ([]Contact, error) {
 	}
 
 	return contacts, nil
+}
+
+func loadCardDAVConfig(filename string) (*CardDAVConfig, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Return empty config if file doesn't exist
+			return &CardDAVConfig{Sources: []CardDAVSource{}}, nil
+		}
+		return nil, err
+	}
+
+	var config CardDAVConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+func saveCardDAVConfig(filename string, config *CardDAVConfig) error {
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filename, data, 0600)
 }
 
 func saveContacts(filename string, contacts []Contact) error {
@@ -851,6 +891,59 @@ func webCardDAVImportHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "carddav-import.html", nil)
 }
 
+func webCardDAVSyncHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Load CardDAV config
+	config, err := loadCardDAVConfig(dataDir + "/carddav-config.json")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to load config: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if len(config.Sources) == 0 {
+		http.Error(w, "No CardDAV sources configured in carddav-config.json", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("CardDAV Sync: Starting sync from %d source(s)", len(config.Sources))
+
+	// Load existing contacts
+	existingContacts, err := loadContacts(dataDir + "/contacts.json")
+	if err != nil {
+		existingContacts = []Contact{}
+	}
+
+	totalImported := 0
+
+	// Import from each source
+	for i, source := range config.Sources {
+		log.Printf("CardDAV Sync: [%d/%d] Syncing from '%s' (%s)", i+1, len(config.Sources), source.Name, source.URL)
+
+		newContacts, err := importFromCardDAV(source.URL, source.Username, source.Password, source.AddressBookPath, source.GroupFilter)
+		if err != nil {
+			log.Printf("CardDAV Sync: Error importing from '%s': %v", source.Name, err)
+			continue
+		}
+
+		log.Printf("CardDAV Sync: Imported %d contact(s) from '%s'", len(newContacts), source.Name)
+		existingContacts = append(existingContacts, newContacts...)
+		totalImported += len(newContacts)
+	}
+
+	// Save all contacts
+	if err := saveContacts(dataDir+"/contacts.json", existingContacts); err != nil {
+		http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("CardDAV Sync: Completed! Total imported: %d contact(s)", totalImported)
+	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+}
+
 func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		action := r.FormValue("action")
@@ -1023,6 +1116,7 @@ func main() {
 	mux.HandleFunc("/contacts/new", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/import", authMiddleware(webImportHandler))
 	mux.HandleFunc("/contacts/import-carddav", authMiddleware(webCardDAVImportHandler))
+	mux.HandleFunc("/contacts/sync-carddav", authMiddleware(webCardDAVSyncHandler))
 	mux.HandleFunc("/contacts/normalize", authMiddleware(normalizeAllHandler))
 
 	loggedMux := loggingMiddleware(mux)

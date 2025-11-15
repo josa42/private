@@ -1,0 +1,19 @@
+{
+  "sources": [
+    {
+      "name": "iCloud Familie",
+      "url": "https://contacts.icloud.com/",
+      "username": "deine@icloud.com",
+      "password": "xxxx-xxxx-xxxx-xxxx",
+      "addressBookPath": "/274887503/carddavhome/card/",
+      "groupFilter": "Familie"
+    },
+    {
+      "name": "Nextcloud Arbeit",
+      "url": "https://nextcloud.example.com/remote.php/dav/addressbooks/users/USERNAME/contacts/",
+      "username": "username",
+      "password": "password",
+      "groupFilter": "Arbeit"
+    }
+  ]
+}
