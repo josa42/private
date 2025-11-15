@@ -33,6 +33,7 @@ Die `carddav-config.json` Datei enthält eine Liste von CardDAV-Quellen:
 - **password**: Passwort (bei iCloud: App-spezifisches Passwort!)
 - **addressBookPath** (optional): Pfad zum Adressbuch (leer = Auto-Discovery)
 - **groupFilter** (optional): Nur Kontakte aus dieser Gruppe (leer = alle)
+- **phoneFilterExclude** (optional): Array von Strings - Nummern die diese Strings enthalten werden ausgeschlossen
 
 ## iCloud Beispiel
 
@@ -45,7 +46,8 @@ Die `carddav-config.json` Datei enthält eine Liste von CardDAV-Quellen:
       "username": "max@icloud.com",
       "password": "abcd-efgh-ijkl-mnop",
       "addressBookPath": "/274887503/carddavhome/card/",
-      "groupFilter": "Familie"
+      "groupFilter": "Familie",
+      "phoneFilterExclude": ["(old)", "(privat)"]
     }
   ]
 }
@@ -55,6 +57,18 @@ Die `carddav-config.json` Datei enthält eine Liste von CardDAV-Quellen:
 - Verwende ein **App-spezifisches Passwort** von https://appleid.apple.com
 - Finde deine **DSID** im Server-Log beim ersten Import
 - Setze den **addressBookPath** mit deiner DSID
+- **phoneFilterExclude**: Filtert z.B. alte Nummern mit "(old)" im Label aus
+
+## Phone Filter Beispiele
+
+```json
+"phoneFilterExclude": ["(old)", "(alt)", "privat", "old"]
+```
+
+Dies schließt Telefonnummern aus, die einen der folgenden Strings enthalten:
+- `+49 123 456789 (old)` → ❌ ausgeschlossen
+- `+49 987 654321 (alt)` → ❌ ausgeschlossen  
+- `+49 111 222333` → ✅ importiert
 
 ## Nextcloud Beispiel
 

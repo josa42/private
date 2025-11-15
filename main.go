@@ -57,12 +57,13 @@ type Contact struct {
 }
 
 type CardDAVSource struct {
-	Name            string `json:"name"`
-	URL             string `json:"url"`
-	Username        string `json:"username"`
-	Password        string `json:"password"`
-	AddressBookPath string `json:"addressBookPath,omitempty"`
-	GroupFilter     string `json:"groupFilter,omitempty"`
+	Name              string   `json:"name"`
+	URL               string   `json:"url"`
+	Username          string   `json:"username"`
+	Password          string   `json:"password"`
+	AddressBookPath   string   `json:"addressBookPath,omitempty"`
+	GroupFilter       string   `json:"groupFilter,omitempty"`
+	PhoneFilterExclude []string `json:"phoneFilterExclude,omitempty"` // Exclude numbers containing these strings
 }
 
 type CardDAVConfig struct {
@@ -534,7 +535,7 @@ func webImportHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "import.html", nil)
 }
 
-func importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFilter string) ([]Contact, error) {
+func importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFilter string, phoneFilterExclude []string) ([]Contact, error) {
 	ctx := context.Background()
 	
 	// Parse and validate URL
@@ -572,7 +573,7 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFil
 			if err == nil {
 				// Success! Continue with this password
 				log.Printf("CardDAV: Authentication successful (password variant %d)", i+1)
-				return importFromCardDAVWithClient(ctx, client, addressBookPath, groupFilter)
+				return importFromCardDAVWithClient(ctx, client, addressBookPath, groupFilter, phoneFilterExclude)
 			}
 			lastErr = err
 			log.Printf("CardDAV: Authentication failed with password variant %d: %v", i+1, err)
@@ -587,10 +588,10 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFil
 		return nil, fmt.Errorf("failed to create CardDAV client: %v", err)
 	}
 
-	return importFromCardDAVWithClient(ctx, client, addressBookPath, groupFilter)
+	return importFromCardDAVWithClient(ctx, client, addressBookPath, groupFilter, phoneFilterExclude)
 }
 
-func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, addressBookPath, groupFilter string) ([]Contact, error) {
+func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, addressBookPath, groupFilter string, phoneFilterExclude []string) ([]Contact, error) {
 	// Find address books
 	var addressBookURL string
 	if addressBookPath != "" {
@@ -745,7 +746,19 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 		processedCount++
 		contact := vCardToContact(obj.Card)
 		if contact.Phone.PhoneNumber != "" {
-			contacts = append(contacts, contact)
+			// Apply phone number exclusion filter
+			shouldExclude := false
+			for _, excludePattern := range phoneFilterExclude {
+				if strings.Contains(contact.Phone.PhoneNumber, excludePattern) {
+					shouldExclude = true
+					log.Printf("CardDAV: Excluding contact '%s' (phone contains '%s')", 
+						getContactDisplayName(contact), excludePattern)
+					break
+				}
+			}
+			if !shouldExclude {
+				contacts = append(contacts, contact)
+			}
 		} else {
 			noPhoneCount++
 			// Debug: Log contact name without phone
@@ -759,6 +772,9 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 		}
 	}
 
+	if len(phoneFilterExclude) > 0 {
+		log.Printf("CardDAV: Phone filter patterns: %v", phoneFilterExclude)
+	}
 	if groupFilterLower != "" {
 		log.Printf("CardDAV: Group filter results: %d matched group, %d filtered out", processedCount, filteredCount)
 	}
@@ -902,7 +918,7 @@ func webCardDAVSyncHandler(w http.ResponseWriter, r *http.Request) {
 	for i, source := range config.Sources {
 		log.Printf("CardDAV Sync: [%d/%d] Syncing from '%s' (%s)", i+1, len(config.Sources), source.Name, source.URL)
 
-		newContacts, err := importFromCardDAV(source.URL, source.Username, source.Password, source.AddressBookPath, source.GroupFilter)
+		newContacts, err := importFromCardDAV(source.URL, source.Username, source.Password, source.AddressBookPath, source.GroupFilter, source.PhoneFilterExclude)
 		if err != nil {
 			log.Printf("CardDAV Sync: Error importing from '%s': %v", source.Name, err)
 			continue
