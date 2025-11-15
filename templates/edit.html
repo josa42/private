@@ -26,7 +26,7 @@
 		<span>›</span>
 		<a href="/contacts">Kontakte</a>
 		<span>›</span>
-		<span>{{if .IsNew}}Neuer Kontakt{{else}}Bearbeiten{{end}}</span>
+		<span>{{if .IsNew}}Neuer Kontakt{{else}}{{.Contact.FirstName}} {{.Contact.LastName}}{{end}}</span>
 	</nav>
 	<h1>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</h1>
 	<form method="POST">
