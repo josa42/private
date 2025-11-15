@@ -140,6 +140,74 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "list.html", contacts)
 }
 
+func normalizePhoneNumber(phone string) string {
+	// Remove all spaces
+	phone = strings.ReplaceAll(phone, " ", "")
+	
+	// German numbers: replace leading 0 with +49
+	if strings.HasPrefix(phone, "0") && !strings.HasPrefix(phone, "00") {
+		phone = "+49" + phone[1:]
+	}
+	
+	// Add space after country code (+49)
+	if strings.HasPrefix(phone, "+49") && len(phone) > 3 {
+		// +49 1234567890 -> +49 1234567890
+		areaAndNumber := phone[3:]
+		
+		// Find where area code ends (typically after 3-4 digits)
+		// Mobile: +49 15x, +49 16x, +49 17x (3 digits area code)
+		// Landline: usually 3-5 digit area codes
+		if len(areaAndNumber) >= 3 {
+			if strings.HasPrefix(areaAndNumber, "15") || 
+			   strings.HasPrefix(areaAndNumber, "16") || 
+			   strings.HasPrefix(areaAndNumber, "17") {
+				// Mobile: +49 15x xxxxxxxx
+				if len(areaAndNumber) >= 10 {
+					phone = "+49 " + areaAndNumber[:3] + " " + areaAndNumber[3:]
+				} else {
+					phone = "+49 " + areaAndNumber
+				}
+			} else {
+				// Landline: try to detect area code length
+				// Common patterns: 3-5 digits
+				if len(areaAndNumber) >= 10 {
+					// Assume 4 digit area code for longer numbers
+					phone = "+49 " + areaAndNumber[:4] + " " + areaAndNumber[4:]
+				} else if len(areaAndNumber) >= 7 {
+					// Assume 3 digit area code
+					phone = "+49 " + areaAndNumber[:3] + " " + areaAndNumber[3:]
+				} else {
+					phone = "+49 " + areaAndNumber
+				}
+			}
+		} else {
+			phone = "+49 " + areaAndNumber
+		}
+	}
+	
+	return phone
+}
+
+func normalizeAllHandler(w http.ResponseWriter, r *http.Request) {
+	contacts, err := loadContacts("contacts.json")
+	if err != nil {
+		http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
+		return
+	}
+
+	// Normalize all phone numbers
+	for i := range contacts {
+		contacts[i].Phone.PhoneNumber = normalizePhoneNumber(contacts[i].Phone.PhoneNumber)
+	}
+
+	if err := saveContacts("contacts.json", contacts); err != nil {
+		http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+}
+
 func parseVCard(vcardData string) []Contact {
 	var contacts []Contact
 	scanner := bufio.NewScanner(strings.NewReader(vcardData))
@@ -347,6 +415,7 @@ func main() {
 	mux.HandleFunc("/contacts/edit", webEditHandler)
 	mux.HandleFunc("/contacts/new", webEditHandler)
 	mux.HandleFunc("/contacts/import", webImportHandler)
+	mux.HandleFunc("/contacts/normalize", normalizeAllHandler)
 
 	loggedMux := loggingMiddleware(mux)
 

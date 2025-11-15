@@ -38,6 +38,12 @@
 	<div class="header">
 		<h1>Kontakte</h1>
 		<div>
+			<form action="/contacts/normalize" method="POST" style="display: inline;" onsubmit="return confirm('Alle Telefonnummern normalisieren (0... → +49..., Leerzeichen einfügen)?')">
+				<button type="submit" class="btn" style="background-color: #FF9800; margin-right: 10px;">
+					<span class="material-icons" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">auto_fix_high</span>
+					Normalisieren
+				</button>
+			</form>
 			<a href="/contacts/import" class="btn" style="margin-right: 10px; background-color: #2196F3;">
 				<span class="material-icons" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">file_upload</span>
 				Import
