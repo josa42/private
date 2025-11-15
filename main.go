@@ -122,6 +122,30 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 
 func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
+		action := r.FormValue("action")
+		
+		if action == "delete" {
+			contacts, err := loadContacts("contacts.json")
+			if err != nil {
+				http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
+				return
+			}
+
+			idStr := r.FormValue("id")
+			if idStr != "" {
+				id, _ := strconv.Atoi(idStr)
+				if id >= 0 && id < len(contacts) {
+					contacts = append(contacts[:id], contacts[id+1:]...)
+					if err := saveContacts("contacts.json", contacts); err != nil {
+						http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
+						return
+					}
+				}
+			}
+			http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+			return
+		}
+
 		contacts, err := loadContacts("contacts.json")
 		if err != nil {
 			http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
