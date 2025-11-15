@@ -463,7 +463,7 @@ func webImportHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "import.html", nil)
 }
 
-func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) ([]Contact, error) {
+func importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFilter string) ([]Contact, error) {
 	ctx := context.Background()
 	
 	// Parse and validate URL
@@ -501,7 +501,7 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) (
 			if err == nil {
 				// Success! Continue with this password
 				log.Printf("CardDAV: Authentication successful (password variant %d)", i+1)
-				return importFromCardDAVWithClient(ctx, client, addressBookPath)
+				return importFromCardDAVWithClient(ctx, client, addressBookPath, groupFilter)
 			}
 			lastErr = err
 			log.Printf("CardDAV: Authentication failed with password variant %d: %v", i+1, err)
@@ -516,10 +516,10 @@ func importFromCardDAV(cardDAVURL, username, password, addressBookPath string) (
 		return nil, fmt.Errorf("failed to create CardDAV client: %v", err)
 	}
 
-	return importFromCardDAVWithClient(ctx, client, addressBookPath)
+	return importFromCardDAVWithClient(ctx, client, addressBookPath, groupFilter)
 }
 
-func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, addressBookPath string) ([]Contact, error) {
+func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, addressBookPath, groupFilter string) ([]Contact, error) {
 	// Find address books
 	var addressBookURL string
 	if addressBookPath != "" {
@@ -578,11 +578,33 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 
 	log.Printf("CardDAV: Retrieved %d address object(s)", len(addressObjects))
 
-	// Convert vCards to contacts
+	// Convert vCards to contacts with optional group filtering
 	var contacts []Contact
+	var filteredCount int
+	groupFilterLower := strings.ToLower(strings.TrimSpace(groupFilter))
+	
 	for _, obj := range addressObjects {
 		if obj.Card == nil {
 			continue
+		}
+
+		// Check group filter if specified
+		if groupFilterLower != "" {
+			categories := obj.Card.Values(vcard.FieldCategories)
+			matchesGroup := false
+			
+			for _, category := range categories {
+				categoryLower := strings.ToLower(strings.TrimSpace(category))
+				if categoryLower == groupFilterLower || strings.Contains(categoryLower, groupFilterLower) {
+					matchesGroup = true
+					break
+				}
+			}
+			
+			if !matchesGroup {
+				filteredCount++
+				continue
+			}
 		}
 
 		contact := vCardToContact(obj.Card)
@@ -591,6 +613,9 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 		}
 	}
 
+	if groupFilterLower != "" {
+		log.Printf("CardDAV: Filtered out %d contact(s) not matching group '%s'", filteredCount, groupFilter)
+	}
 	log.Printf("CardDAV: Successfully converted %d contact(s) with phone numbers", len(contacts))
 	return contacts, nil
 }
@@ -669,6 +694,7 @@ func webCardDAVImportHandler(w http.ResponseWriter, r *http.Request) {
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 		addressBookPath := r.FormValue("addressBookPath")
+		groupFilter := r.FormValue("groupFilter")
 
 		if cardDAVURL == "" {
 			data := struct {
@@ -681,7 +707,7 @@ func webCardDAVImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Import contacts from CardDAV
-		newContacts, err := importFromCardDAV(cardDAVURL, username, password, addressBookPath)
+		newContacts, err := importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFilter)
 		if err != nil {
 			data := struct {
 				Error string
