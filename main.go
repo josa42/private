@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
+	"flag"
 	"fmt"
 	"html/template"
 	"log"
@@ -555,7 +556,66 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "edit.html", data)
 }
 
+func addUser(credentials string) error {
+	parts := strings.SplitN(credentials, ":", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid format, expected username:password")
+	}
+
+	username := parts[0]
+	password := parts[1]
+
+	if username == "" || password == "" {
+		return fmt.Errorf("username and password cannot be empty")
+	}
+
+	users, err := loadUsers()
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to load users: %v", err)
+	}
+
+	// Check if user already exists
+	for _, user := range users {
+		if user.Username == username {
+			return fmt.Errorf("user '%s' already exists", username)
+		}
+	}
+
+	salt := generateSalt()
+	hash := hashPassword(password, salt)
+
+	newUser := User{
+		Username: username,
+		Hash:     hash,
+		Salt:     salt,
+	}
+
+	users = append(users, newUser)
+
+	data, err := json.MarshalIndent(users, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal users: %v", err)
+	}
+
+	if err := os.WriteFile("users.json", data, 0600); err != nil {
+		return fmt.Errorf("failed to write users.json: %v", err)
+	}
+
+	return nil
+}
+
 func main() {
+	addUserFlag := flag.String("add-user", "", "Add a new user (format: username:password)")
+	flag.Parse()
+
+	if *addUserFlag != "" {
+		if err := addUser(*addUserFlag); err != nil {
+			log.Fatalf("Error adding user: %v", err)
+		}
+		log.Printf("User added successfully")
+		return
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", authMiddleware(handler))
 	mux.HandleFunc("/phonebook.xml", addressbookHandler)

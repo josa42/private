@@ -760,3 +760,140 @@ func TestLoggingMiddleware(t *testing.T) {
 		t.Errorf("status = %d, want %d", w.Result().StatusCode, http.StatusOK)
 	}
 }
+
+// Test addUser function
+func TestAddUser(t *testing.T) {
+	tmpFile := "users.json"
+	originalData, _ := os.ReadFile(tmpFile)
+	defer os.WriteFile(tmpFile, originalData, 0644)
+
+	// Start with empty users
+	os.WriteFile(tmpFile, []byte("[]"), 0644)
+
+	tests := []struct {
+		name        string
+		credentials string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "valid user",
+			credentials: "newuser:newpass",
+			wantErr:     false,
+		},
+		{
+			name:        "duplicate user",
+			credentials: "newuser:anotherpass",
+			wantErr:     true,
+			errContains: "already exists",
+		},
+		{
+			name:        "invalid format - no colon",
+			credentials: "userpassword",
+			wantErr:     true,
+			errContains: "invalid format",
+		},
+		{
+			name:        "invalid format - empty username",
+			credentials: ":password",
+			wantErr:     true,
+			errContains: "cannot be empty",
+		},
+		{
+			name:        "invalid format - empty password",
+			credentials: "username:",
+			wantErr:     true,
+			errContains: "cannot be empty",
+		},
+		{
+			name:        "valid user with colon in password",
+			credentials: "user2:pass:word",
+			wantErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := addUser(tt.credentials)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("addUser() expected error, got nil")
+				} else if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("addUser() error = %v, should contain %q", err, tt.errContains)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("addUser() unexpected error = %v", err)
+				}
+			}
+		})
+	}
+
+	// Verify users were added correctly
+	users, err := loadUsers()
+	if err != nil {
+		t.Fatalf("loadUsers() failed: %v", err)
+	}
+
+	expectedUsers := []string{"newuser", "user2"}
+	if len(users) != len(expectedUsers) {
+		t.Errorf("expected %d users, got %d", len(expectedUsers), len(users))
+	}
+
+	for i, expectedUsername := range expectedUsers {
+		if users[i].Username != expectedUsername {
+			t.Errorf("user[%d].Username = %q, want %q", i, users[i].Username, expectedUsername)
+		}
+		if users[i].Salt == "" {
+			t.Errorf("user[%d].Salt is empty", i)
+		}
+		if users[i].Hash == "" {
+			t.Errorf("user[%d].Hash is empty", i)
+		}
+		if len(users[i].Salt) < 20 {
+			t.Errorf("user[%d].Salt too short: %d chars", i, len(users[i].Salt))
+		}
+	}
+
+	// Verify password hashing works correctly
+	if !authenticateUser("newuser", "newpass") {
+		t.Error("authentication failed for newuser with correct password")
+	}
+	if authenticateUser("newuser", "wrongpass") {
+		t.Error("authentication succeeded for newuser with wrong password")
+	}
+	if !authenticateUser("user2", "pass:word") {
+		t.Error("authentication failed for user2 with password containing colon")
+	}
+}
+
+// Test addUser with non-existent users.json file
+func TestAddUserNewFile(t *testing.T) {
+	tmpFile := "test_users_new.json"
+	defer os.Remove(tmpFile)
+
+	// Temporarily rename users.json
+	if _, err := os.Stat("users.json"); err == nil {
+		os.Rename("users.json", "users.json.bak")
+		defer os.Rename("users.json.bak", "users.json")
+	}
+
+	err := addUser("testuser:testpass")
+	if err != nil {
+		t.Fatalf("addUser() with new file failed: %v", err)
+	}
+
+	users, err := loadUsers()
+	if err != nil {
+		t.Fatalf("loadUsers() failed: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Errorf("expected 1 user, got %d", len(users))
+	}
+
+	if users[0].Username != "testuser" {
+		t.Errorf("username = %q, want %q", users[0].Username, "testuser")
+	}
+}
+
