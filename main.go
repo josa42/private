@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -50,6 +53,14 @@ type AddressBook struct {
 	Contacts []Contact `xml:"Contact" json:"-"`
 }
 
+type User struct {
+	Username string `json:"username"`
+	Hash     string `json:"hash"`
+	Salt     string `json:"salt"`
+}
+
+var sessions = make(map[string]string) // sessionID -> username
+
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -63,6 +74,122 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func loadUsers() ([]User, error) {
+	data, err := os.ReadFile("users.json")
+	if err != nil {
+		return nil, err
+	}
+	
+	var users []User
+	if err := json.Unmarshal(data, &users); err != nil {
+		return nil, err
+	}
+	
+	return users, nil
+}
+
+func hashPassword(password, salt string) string {
+	hash := sha256.Sum256([]byte(password + salt))
+	return base64.StdEncoding.EncodeToString(hash[:])
+}
+
+func generateSalt() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return base64.StdEncoding.EncodeToString(bytes)
+}
+
+func authenticateUser(username, password string) bool {
+	users, err := loadUsers()
+	if err != nil {
+		log.Printf("Error loading users: %v", err)
+		return false
+	}
+	
+	for _, user := range users {
+		if user.Username == username {
+			hash := hashPassword(password, user.Salt)
+			return hash == user.Hash
+		}
+	}
+	
+	return false
+}
+
+func getSessionUser(r *http.Request) string {
+	cookie, err := r.Cookie("session")
+	if err != nil {
+		return ""
+	}
+	
+	username, exists := sessions[cookie.Value]
+	if !exists {
+		return ""
+	}
+	
+	return username
+}
+
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := getSessionUser(r)
+		if username == "" {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		username := r.FormValue("username")
+		password := r.FormValue("password")
+		
+		if authenticateUser(username, password) {
+			sessionID := generateSalt() // reuse salt generator for session ID
+			sessions[sessionID] = username
+			
+			http.SetCookie(w, &http.Cookie{
+				Name:     "session",
+				Value:    sessionID,
+				Path:     "/",
+				HttpOnly: true,
+				MaxAge:   86400 * 7, // 7 days
+			})
+			
+			http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+			return
+		}
+		
+		data := struct {
+			Error string
+		}{
+			Error: "Ungültiger Benutzername oder Passwort",
+		}
+		templates.ExecuteTemplate(w, "login.html", data)
+		return
+	}
+	
+	templates.ExecuteTemplate(w, "login.html", nil)
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session")
+	if err == nil {
+		delete(sessions, cookie.Value)
+	}
+	
+	http.SetCookie(w, &http.Cookie{
+		Name:   "session",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+	
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -432,11 +559,13 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handler)
 	mux.HandleFunc("/phonebook.xml", addressbookHandler)
-	mux.HandleFunc("/contacts", webListHandler)
-	mux.HandleFunc("/contacts/edit", webEditHandler)
-	mux.HandleFunc("/contacts/new", webEditHandler)
-	mux.HandleFunc("/contacts/import", webImportHandler)
-	mux.HandleFunc("/contacts/normalize", normalizeAllHandler)
+	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/logout", logoutHandler)
+	mux.HandleFunc("/contacts", authMiddleware(webListHandler))
+	mux.HandleFunc("/contacts/edit", authMiddleware(webEditHandler))
+	mux.HandleFunc("/contacts/new", authMiddleware(webEditHandler))
+	mux.HandleFunc("/contacts/import", authMiddleware(webImportHandler))
+	mux.HandleFunc("/contacts/normalize", authMiddleware(normalizeAllHandler))
 
 	loggedMux := loggingMiddleware(mux)
 
