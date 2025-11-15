@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"embed"
 	"encoding/json"
 	"encoding/xml"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -120,7 +122,105 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "list.html", contacts)
 }
 
-func webEditHandler(w http.ResponseWriter, r *http.Request) {
+func parseVCard(vcardData string) []Contact {
+	var contacts []Contact
+	scanner := bufio.NewScanner(strings.NewReader(vcardData))
+	
+	var currentContact *Contact
+	
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		
+		if line == "BEGIN:VCARD" {
+			currentContact = &Contact{
+				Phone: Phone{
+					AccountIndex: 0,
+				},
+				Groups: Groups{
+					GroupID: 1,
+				},
+			}
+		} else if line == "END:VCARD" {
+			if currentContact != nil && currentContact.Phone.PhoneNumber != "" {
+				contacts = append(contacts, *currentContact)
+			}
+			currentContact = nil
+		} else if currentContact != nil {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := parts[0]
+				value := parts[1]
+				
+				if strings.HasPrefix(key, "FN") {
+					nameParts := strings.Fields(value)
+					if len(nameParts) >= 2 {
+						currentContact.FirstName = nameParts[0]
+						currentContact.LastName = strings.Join(nameParts[1:], " ")
+					} else if len(nameParts) == 1 {
+						currentContact.FirstName = nameParts[0]
+					}
+				} else if strings.HasPrefix(key, "N") {
+					nameParts := strings.Split(value, ";")
+					if len(nameParts) >= 2 {
+						currentContact.LastName = nameParts[0]
+						currentContact.FirstName = nameParts[1]
+					}
+				} else if strings.HasPrefix(key, "TEL") {
+					phone := strings.TrimSpace(value)
+					phone = strings.ReplaceAll(phone, " ", "")
+					phone = strings.ReplaceAll(phone, "-", "")
+					if currentContact.Phone.PhoneNumber == "" {
+						currentContact.Phone.PhoneNumber = phone
+					}
+				}
+			}
+		}
+	}
+	
+	return contacts
+}
+
+func webImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		file, _, err := r.FormFile("vcardfile")
+		if err != nil {
+			http.Error(w, "Failed to read file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		var vcardData strings.Builder
+		for scanner.Scan() {
+			vcardData.WriteString(scanner.Text())
+			vcardData.WriteString("\n")
+		}
+
+		newContacts := parseVCard(vcardData.String())
+		
+		if len(newContacts) == 0 {
+			http.Error(w, "No valid contacts found in vCard file", http.StatusBadRequest)
+			return
+		}
+
+		existingContacts, err := loadContacts("contacts.json")
+		if err != nil {
+			existingContacts = []Contact{}
+		}
+
+		existingContacts = append(existingContacts, newContacts...)
+
+		if err := saveContacts("contacts.json", existingContacts); err != nil {
+			http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, "/contacts", http.StatusSeeOther)
+		return
+	}
+
+	templates.ExecuteTemplate(w, "import.html", nil)
+}
 	if r.Method == "POST" {
 		action := r.FormValue("action")
 		
@@ -222,6 +322,7 @@ func main() {
 	mux.HandleFunc("/contacts", webListHandler)
 	mux.HandleFunc("/contacts/edit", webEditHandler)
 	mux.HandleFunc("/contacts/new", webEditHandler)
+	mux.HandleFunc("/contacts/import", webImportHandler)
 
 	loggedMux := loggingMiddleware(mux)
 
