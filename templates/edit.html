@@ -66,7 +66,10 @@
 		<div class="phone-row">
 			<div>
 				<label>Telefonnummer:</label>
-				<input type="text" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}" required>
+				<input type="tel" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}" 
+				       pattern="[\d\s\+\-/()]+" 
+				       title="Nur Ziffern, Leerzeichen und +, -, /, () erlaubt"
+				       required>
 			</div>
 			<div>
 				<label>Typ:</label>
