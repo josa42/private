@@ -5,6 +5,10 @@
 	<title>Kontakte</title>
 	<style>
 		body { font-family: Arial, sans-serif; margin: 20px; }
+		.breadcrumb { margin-bottom: 20px; color: #666; }
+		.breadcrumb a { color: #4CAF50; text-decoration: none; }
+		.breadcrumb a:hover { text-decoration: underline; }
+		.breadcrumb span { margin: 0 5px; }
 		.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 		table { border-collapse: collapse; width: 100%; }
 		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
@@ -19,6 +23,11 @@
 	</style>
 </head>
 <body>
+	<nav class="breadcrumb">
+		<a href="/">Home</a>
+		<span>›</span>
+		<span>Kontakte</span>
+	</nav>
 	<div class="header">
 		<h1>Kontakte</h1>
 		<a href="/contacts/new" class="btn">Neuer Kontakt</a>
