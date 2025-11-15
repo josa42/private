@@ -141,8 +141,17 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func normalizePhoneNumber(phone string) string {
-	// Remove all spaces
+	// Remove all spaces first
 	phone = strings.ReplaceAll(phone, " ", "")
+	
+	// Remove invalid characters (keep only digits and +)
+	var cleaned strings.Builder
+	for _, char := range phone {
+		if (char >= '0' && char <= '9') || char == '+' {
+			cleaned.WriteRune(char)
+		}
+	}
+	phone = cleaned.String()
 	
 	// German numbers: replace leading 0 with +49
 	if strings.HasPrefix(phone, "0") && !strings.HasPrefix(phone, "00") {
