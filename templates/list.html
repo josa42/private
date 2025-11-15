@@ -162,12 +162,14 @@
 						Normalisieren
 					</button>
 				</form>
+				{{if .HasCardDAVConfig}}
 				<form action="/contacts/sync-carddav" method="POST" style="display: inline;">
 					<button type="submit" class="btn" style="background-color: #9C27B0; margin-right: 10px;">
 						<span class="material-icons" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">sync</span>
 						CardDAV Sync
 					</button>
 				</form>
+				{{end}}
 				<a href="/contacts/import" class="btn" style="margin-right: 10px; background-color: #2196F3;">
 					<span class="material-icons" style="vertical-align: middle; font-size: 18px; margin-right: 4px;">file_upload</span>
 					vCard
@@ -185,7 +187,7 @@
 				<th>Telefonnummer</th>
 				<th style="width: 90px;">Aktionen</th>
 			</tr>
-			{{range $i, $c := .}}
+			{{range $i, $c := .Contacts}}
 			<tr onclick="window.location='/contacts/edit?id={{$i}}'">
 				<td>
 					{{if $c.CompanyName}}

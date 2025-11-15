@@ -323,7 +323,19 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templates.ExecuteTemplate(w, "list.html", contacts)
+	// Check if CardDAV config exists and has sources
+	config, _ := loadCardDAVConfig(dataDir + "/carddav-config.json")
+	hasCardDAVConfig := config != nil && len(config.Sources) > 0
+
+	data := struct {
+		Contacts         []Contact
+		HasCardDAVConfig bool
+	}{
+		Contacts:         contacts,
+		HasCardDAVConfig: hasCardDAVConfig,
+	}
+
+	templates.ExecuteTemplate(w, "list.html", data)
 }
 
 func normalizePhoneNumber(phone string) string {
