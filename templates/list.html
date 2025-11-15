@@ -54,8 +54,8 @@
 		</tr>
 		{{range $i, $c := .}}
 		<tr onclick="window.location='/contacts/edit?id={{$i}}'">
-			<td>{{$c.FirstName}}</td>
-			<td>{{$c.LastName}}</td>
+			<td>{{if $c.FirstName}}{{$c.FirstName}}{{else}}-{{end}}</td>
+			<td>{{if $c.LastName}}{{$c.LastName}}{{else}}-{{end}}</td>
 			<td>{{$c.Phone.PhoneNumber}}</td>
 			<td class="actions">
 				<a href="/contacts/edit?id={{$i}}" onclick="event.stopPropagation()" title="Bearbeiten">

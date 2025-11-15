@@ -38,8 +38,8 @@ type Groups struct {
 
 type Contact struct {
 	XMLName   xml.Name `xml:"Contact" json:"-"`
-	LastName  string   `xml:"LastName" json:"lastName"`
-	FirstName string   `xml:"FirstName" json:"firstName"`
+	LastName  string   `xml:"LastName,omitempty" json:"lastName,omitempty"`
+	FirstName string   `xml:"FirstName,omitempty" json:"firstName,omitempty"`
 	Phone     Phone    `xml:"Phone" json:"phone"`
 	Groups    Groups   `xml:"Groups" json:"groups"`
 }

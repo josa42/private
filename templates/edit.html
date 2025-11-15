@@ -35,17 +35,17 @@
 		<span>›</span>
 		<a href="/contacts">Kontakte</a>
 		<span>›</span>
-		<span>{{if .IsNew}}Neuer Kontakt{{else}}{{.Contact.FirstName}} {{.Contact.LastName}}{{end}}</span>
+		<span>{{if .IsNew}}Neuer Kontakt{{else}}{{if .Contact.FirstName}}{{.Contact.FirstName}} {{.Contact.LastName}}{{else}}{{.Contact.Phone.PhoneNumber}}{{end}}{{end}}</span>
 	</nav>
 	<h1>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</h1>
 	<form method="POST">
 		<input type="hidden" name="id" value="{{.ID}}">
 		
 		<label>Vorname:</label>
-		<input type="text" name="firstName" value="{{.Contact.FirstName}}" required>
+		<input type="text" name="firstName" value="{{.Contact.FirstName}}">
 		
 		<label>Nachname:</label>
-		<input type="text" name="lastName" value="{{.Contact.LastName}}" required>
+		<input type="text" name="lastName" value="{{.Contact.LastName}}">
 		
 		<div class="phone-row">
 			<div>
