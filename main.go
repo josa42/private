@@ -883,25 +883,7 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 					log.Printf("CardDAV DEBUG: Found LABEL: '%s'", label)
 				}
 				
-				// Method 3: Check all TYPE values
-				if typeParams, ok := field.Params["TYPE"]; ok {
-					for _, typeVal := range typeParams {
-						// Check if any TYPE value contains our exclusion pattern
-						for _, excludePattern := range phoneFilterExclude {
-							if strings.Contains(typeVal, excludePattern) {
-								label = typeVal
-								log.Printf("CardDAV DEBUG: Found pattern '%s' in TYPE value: '%s'", excludePattern, typeVal)
-								shouldSkip = true
-								break
-							}
-						}
-						if shouldSkip {
-							break
-						}
-					}
-				}
-				
-				// Method 4: Check field.Group for item-based labels
+				// Method 3: Check field.Group for item-based labels
 				// iCloud stores labels as separate X-ABLABEL fields with the same Group
 				if field.Group != "" && label == "" {
 					log.Printf("CardDAV DEBUG: Field has Group: '%s'", field.Group)
@@ -920,21 +902,16 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 					}
 				}
 				
-				// Now check label against exclusion patterns (if not already skipped)
-				if !shouldSkip {
-					for _, excludePattern := range phoneFilterExclude {
-						log.Printf("CardDAV DEBUG: Checking if label '%s' or value '%s' contains '%s'", 
-							label, field.Value, excludePattern)
-						if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
-							shouldSkip = true
-							log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - contains '%s'", 
-								field.Value, label, contactName, excludePattern)
-							break
-						}
+				// Check label against exclusion patterns
+				for _, excludePattern := range phoneFilterExclude {
+					log.Printf("CardDAV DEBUG: Checking if label '%s' contains '%s'", 
+						label, excludePattern)
+					if strings.Contains(label, excludePattern) {
+						shouldSkip = true
+						log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - label contains '%s'", 
+							field.Value, label, contactName, excludePattern)
+						break
 					}
-				} else {
-					log.Printf("CardDAV: Skipping phone '%s' for contact '%s' - TYPE contains exclusion pattern", 
-						field.Value, contactName)
 				}
 			}
 			
