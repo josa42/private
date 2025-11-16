@@ -173,7 +173,7 @@
 				<th style="width: 90px;">Aktionen</th>
 			</tr>
 			{{range .Contacts}}
-			<tr{{if not .Source}} onclick="window.location='/contacts/edit?id={{.ID}}'"{{end}}{{if .Source}} style="cursor: default;"{{end}}>
+			<tr onclick="window.location='/contacts/edit?id={{.ID}}'" style="cursor: pointer;">
 				<td>
 					{{if .CompanyName}}
 						<strong>{{.CompanyName}}</strong>

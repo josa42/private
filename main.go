@@ -1101,6 +1101,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 	var contact Contact
 	isNew := idStr == ""
 
+	var isSynced bool
 	if !isNew {
 		contacts, err := loadContacts(dataDir + "/contacts.json")
 		if err != nil {
@@ -1110,22 +1111,20 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(idStr)
 		if id >= 0 && id < len(contacts) {
 			contact = contacts[id]
-			// Prevent editing synced contacts
-			if contact.Source != "" {
-				http.Error(w, "Cannot edit synced contact. This contact is managed by CardDAV sync.", http.StatusForbidden)
-				return
-			}
+			isSynced = contact.Source != ""
 		}
 	}
 
 	data := struct {
-		Contact Contact
-		ID      string
-		IsNew   bool
+		Contact  Contact
+		ID       string
+		IsNew    bool
+		IsSynced bool
 	}{
-		Contact: contact,
-		ID:      idStr,
-		IsNew:   isNew,
+		Contact:  contact,
+		ID:       idStr,
+		IsNew:    isNew,
+		IsSynced: isSynced,
 	}
 	templates.ExecuteTemplate(w, "edit.html", data)
 }

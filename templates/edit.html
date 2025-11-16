@@ -156,27 +156,32 @@
 			</a>
 		</nav>
 		<div class="container-inner">
-	<h1>{{if .IsNew}}Neuer Kontakt{{else}}Kontakt bearbeiten{{end}}</h1>
+	<h1>{{if .IsNew}}Neuer Kontakt{{else if .IsSynced}}Kontakt ansehen{{else}}Kontakt bearbeiten{{end}}</h1>
+	{{if .IsSynced}}
+	<div style="background-color: #fff3cd; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #ffc107; color: #856404;">
+		<strong>ℹ️ Dieser Kontakt wird über CardDAV synchronisiert und kann nicht bearbeitet werden.</strong>
+	</div>
+	{{end}}
 	<form method="POST">
 		<input type="hidden" name="id" value="{{.ID}}">
 
 		<label>Kontakttyp:</label>
-		<select id="contactType" class="contact-type-select" onchange="toggleContactType()">
+		<select id="contactType" class="contact-type-select" onchange="toggleContactType()" {{if .IsSynced}}disabled{{end}}>
 			<option value="person" {{if not .Contact.CompanyName}}selected{{end}}>Person</option>
 			<option value="company" {{if .Contact.CompanyName}}selected{{end}}>Firma</option>
 		</select>
 
 		<div id="personFields" class="form-section">
 			<label>Vorname:</label>
-			<input type="text" id="firstName" name="firstName" value="{{.Contact.FirstName}}">
+			<input type="text" id="firstName" name="firstName" value="{{.Contact.FirstName}}" {{if .IsSynced}}readonly{{end}}>
 
 			<label>Nachname:</label>
-			<input type="text" id="lastName" name="lastName" value="{{.Contact.LastName}}">
+			<input type="text" id="lastName" name="lastName" value="{{.Contact.LastName}}" {{if .IsSynced}}readonly{{end}}>
 		</div>
 
 		<div id="companyFields" class="form-section">
 			<label>Firmenname:</label>
-			<input type="text" id="companyName" name="companyName" value="{{.Contact.CompanyName}}">
+			<input type="text" id="companyName" name="companyName" value="{{.Contact.CompanyName}}" {{if .IsSynced}}readonly{{end}}>
 		</div>
 
 		<div class="phone-section">
@@ -184,31 +189,33 @@
 				<div>
 					<label>Mobil:</label>
 					<input type="tel" name="phoneMobile" value="{{range .Contact.Phones}}{{if eq .Type "cell"}}{{.PhoneNumber}}{{end}}{{end}}"
-					       pattern="^[\d\s+]*$">
+					       pattern="^[\d\s+]*$" {{if .IsSynced}}readonly{{end}}>
 				</div>
 			</div>
 			<div class="phone-row">
 				<div>
 					<label>Privat:</label>
 					<input type="tel" name="phoneHome" value="{{range .Contact.Phones}}{{if eq .Type "home"}}{{.PhoneNumber}}{{end}}{{end}}"
-					       pattern="^[\d\s+]*$">
+					       pattern="^[\d\s+]*$" {{if .IsSynced}}readonly{{end}}>
 				</div>
 			</div>
 			<div class="phone-row">
 				<div>
 					<label>Firma:</label>
 					<input type="tel" name="phoneWork" value="{{range .Contact.Phones}}{{if eq .Type "work"}}{{.PhoneNumber}}{{end}}{{end}}"
-					       pattern="^[\d\s+]*$">
+					       pattern="^[\d\s+]*$" {{if .IsSynced}}readonly{{end}}>
 				</div>
 			</div>
 		</div>
 
 		<div class="form-buttons">
-			{{if not .IsNew}}
+			{{if and (not .IsNew) (not .IsSynced)}}
 			<button type="submit" name="action" value="delete" class="delete" onclick="return confirm('Kontakt wirklich löschen?')">Löschen</button>
 			{{end}}
-			<a href="/contacts" class="cancel">Abbrechen</a>
+			<a href="/contacts" class="cancel">{{if .IsSynced}}Zurück{{else}}Abbrechen{{end}}</a>
+			{{if not .IsSynced}}
 			<button type="submit" class="btn">Speichern</button>
+			{{end}}
 		</div>
 	</form>
 	</div>
