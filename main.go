@@ -217,19 +217,14 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	// Only handle root path, return 404 for other paths
-	if r.URL.Path != "/" {
-		w.WriteHeader(http.StatusNotFound)
-		templates.ExecuteTemplate(w, "404.html", nil)
+	// Redirect root path to /contacts, return 404 for other paths
+	if r.URL.Path == "/" {
+		http.Redirect(w, r, "/contacts", http.StatusFound)
 		return
 	}
 	
-	data := struct {
-		Host string
-	}{
-		Host: r.Host,
-	}
-	templates.ExecuteTemplate(w, "home.html", data)
+	w.WriteHeader(http.StatusNotFound)
+	templates.ExecuteTemplate(w, "404.html", nil)
 }
 
 func loadContacts(filename string) ([]Contact, error) {
