@@ -744,21 +744,49 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 		}
 
 		processedCount++
-		contact := vCardToContact(obj.Card)
-		if contact.Phone.PhoneNumber != "" {
-			// Apply phone number exclusion filter
-			shouldExclude := false
-			for _, excludePattern := range phoneFilterExclude {
-				if strings.Contains(contact.Phone.PhoneNumber, excludePattern) {
-					shouldExclude = true
-					log.Printf("CardDAV: Excluding contact '%s' (phone contains '%s')", 
-						getContactDisplayName(contact), excludePattern)
-					break
+		
+		// Check phone labels for exclusion filter BEFORE converting
+		shouldExcludeByLabel := false
+		if len(phoneFilterExclude) > 0 {
+			// Card is a map[string][]*Field, access TEL fields directly
+			if telFields, ok := obj.Card[vcard.FieldTelephone]; ok {
+				for _, field := range telFields {
+					// Check X-ABLABEL (iOS/iCloud) or LABEL parameter
+					label := ""
+					if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
+						label = labelParam[0]
+					}
+					if labelParam, ok := field.Params["LABEL"]; ok && len(labelParam) > 0 {
+						label = labelParam[0]
+					}
+					
+					// Check if label or value contains any exclusion pattern
+					for _, excludePattern := range phoneFilterExclude {
+						if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
+							shouldExcludeByLabel = true
+							// Get contact name for logging
+							fn := obj.Card.PreferredValue(vcard.FieldFormattedName)
+							if fn == "" {
+								fn = field.Value
+							}
+							log.Printf("CardDAV: Excluding contact '%s' (phone label/value contains '%s')", fn, excludePattern)
+							break
+						}
+					}
+					if shouldExcludeByLabel {
+						break
+					}
 				}
 			}
-			if !shouldExclude {
-				contacts = append(contacts, contact)
-			}
+		}
+		
+		if shouldExcludeByLabel {
+			continue
+		}
+		
+		contact := vCardToContact(obj.Card)
+		if contact.Phone.PhoneNumber != "" {
+			contacts = append(contacts, contact)
 		} else {
 			noPhoneCount++
 			// Debug: Log contact name without phone
@@ -856,9 +884,7 @@ func vCardToContact(card vcard.Card) Contact {
 			continue
 		}
 
-		// Get type parameter for this field
-		// Since we only have the value, we'll use the first phone we find
-		// and default to "cell" type
+		// Use the first phone we find and default to "cell" type
 		if selectedPhone == "" {
 			selectedPhone = phone
 			phoneType = "cell"
