@@ -149,7 +149,7 @@
 				<span>›</span>
 				<a href="/contacts">Kontakte</a>
 				<span>›</span>
-				<span>{{if .IsNew}}Neuer Kontakt{{else}}{{if .Contact.CompanyName}}{{.Contact.CompanyName}}{{else if .Contact.FirstName}}{{.Contact.FirstName}} {{.Contact.LastName}}{{else}}{{.Contact.Phone.PhoneNumber}}{{end}}{{end}}</span>
+				<span>{{if .IsNew}}Neuer Kontakt{{else}}{{if .Contact.CompanyName}}{{.Contact.CompanyName}}{{else if .Contact.FirstName}}{{.Contact.FirstName}} {{.Contact.LastName}}{{else}}{{range .Contact.Phones}}{{.PhoneNumber}}{{break}}{{end}}{{end}}{{end}}</span>
 			</div>
 			<a href="/logout" class="logout-btn" title="Abmelden">
 				<span class="material-icons" style="font-size: 20px;">logout</span>
@@ -179,20 +179,27 @@
 			<input type="text" id="companyName" name="companyName" value="{{.Contact.CompanyName}}">
 		</div>
 
-		<div class="phone-row">
-			<div>
-				<label>Telefonnummer:</label>
-				<input type="tel" name="phoneNumber" value="{{.Contact.Phone.PhoneNumber}}"
-				       pattern="^[\d\s+]+$"
-				       required>
+		<div class="phone-section">
+			<div class="phone-row">
+				<div>
+					<label>Mobil:</label>
+					<input type="tel" name="phoneMobile" value="{{range .Contact.Phones}}{{if eq .Type "cell"}}{{.PhoneNumber}}{{end}}{{end}}"
+					       pattern="^[\d\s+]*$">
+				</div>
 			</div>
-			<div>
-				<label>Typ:</label>
-				<select name="phoneType" style="width: 100%;">
-					<option value="cell" {{if eq .Contact.Phone.Type "cell"}}selected{{end}}>Mobil</option>
-					<option value="work" {{if eq .Contact.Phone.Type "work"}}selected{{end}}>Firma</option>
-					<option value="home" {{if eq .Contact.Phone.Type "home"}}selected{{end}}>Privat</option>
-				</select>
+			<div class="phone-row">
+				<div>
+					<label>Privat:</label>
+					<input type="tel" name="phoneHome" value="{{range .Contact.Phones}}{{if eq .Type "home"}}{{.PhoneNumber}}{{end}}{{end}}"
+					       pattern="^[\d\s+]*$">
+				</div>
+			</div>
+			<div class="phone-row">
+				<div>
+					<label>Firma:</label>
+					<input type="tel" name="phoneWork" value="{{range .Contact.Phones}}{{if eq .Type "work"}}{{.PhoneNumber}}{{end}}{{end}}"
+					       pattern="^[\d\s+]*$">
+				</div>
 			</div>
 		</div>
 

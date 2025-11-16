@@ -193,7 +193,11 @@
 						-
 					{{end}}
 				</td>
-				<td>{{$c.Phone.PhoneNumber}}</td>
+				<td>
+					{{range $c.Phones}}
+						{{.PhoneNumber}}{{if ne .Type "cell"}} ({{.Type}}){{end}}<br>
+					{{end}}
+				</td>
 				<td class="actions">
 					{{if not $c.Source}}
 					<a href="/contacts/edit?id={{$i}}" onclick="event.stopPropagation()" title="Bearbeiten">

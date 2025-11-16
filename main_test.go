@@ -24,10 +24,12 @@ func createTestContacts() []Contact {
 		{
 			FirstName: "John",
 			LastName:  "Doe",
-			Phone: Phone{
-				Type:         "cell",
-				PhoneNumber:  "+49 151 12345678",
-				AccountIndex: 0,
+			Phones: []Phone{
+				{
+					Type:         "cell",
+					PhoneNumber:  "+49 151 12345678",
+					AccountIndex: 0,
+				},
 			},
 			Groups: Groups{GroupID: 1},
 		},
@@ -35,10 +37,12 @@ func createTestContacts() []Contact {
 			FirstName:   "Jane",
 			LastName:    "Smith",
 			CompanyName: "Test Corp",
-			Phone: Phone{
-				Type:         "work",
-				PhoneNumber:  "+49 30 1234567",
-				AccountIndex: 0,
+			Phones: []Phone{
+				{
+					Type:         "work",
+					PhoneNumber:  "+49 30 1234567",
+					AccountIndex: 0,
+				},
 			},
 			Groups: Groups{GroupID: 1},
 		},
@@ -160,60 +164,59 @@ func TestLoadAndSaveContacts(t *testing.T) {
 	}
 }
 
-// Test loadContacts with type migration
+// Test loadContacts with migration from old single phone to new multiple phones format
 func TestLoadContactsTypeMigration(t *testing.T) {
 	tmpFile := "test_contacts_migration.json"
 	defer os.Remove(tmpFile)
 
-	// Create contacts with old type values
-	oldContacts := []Contact{
+	// Create old format JSON with "phone" field
+	oldJSON := `[
 		{
-			FirstName: "Test",
-			LastName:  "Mobile",
-			Phone: Phone{
-				Type:         "Mobile",
-				PhoneNumber:  "+49 151 12345678",
-				AccountIndex: 0,
+			"firstName": "Test",
+			"lastName": "Mobile",
+			"phone": {
+				"type": "Mobile",
+				"phoneNumber": "+49 151 12345678",
+				"accountIndex": 0
 			},
-			Groups: Groups{GroupID: 1},
+			"groups": {"groupId": 1}
 		},
 		{
-			FirstName: "Test",
-			LastName:  "Work",
-			Phone: Phone{
-				Type:         "Work",
-				PhoneNumber:  "+49 30 1234567",
-				AccountIndex: 0,
+			"firstName": "Test",
+			"lastName": "Work",
+			"phone": {
+				"type": "Work",
+				"phoneNumber": "+49 30 1234567",
+				"accountIndex": 0
 			},
-			Groups: Groups{GroupID: 1},
+			"groups": {"groupId": 1}
 		},
 		{
-			FirstName: "Test",
-			LastName:  "NoType",
-			Phone: Phone{
-				PhoneNumber:  "+49 30 7654321",
-				AccountIndex: 0,
+			"firstName": "Test",
+			"lastName": "NoType",
+			"phone": {
+				"phoneNumber": "+49 30 7654321",
+				"accountIndex": 0
 			},
-			Groups: Groups{GroupID: 1},
-		},
-	}
+			"groups": {"groupId": 1}
+		}
+	]`
 
-	data, _ := json.Marshal(oldContacts)
-	os.WriteFile(tmpFile, data, 0644)
+	os.WriteFile(tmpFile, []byte(oldJSON), 0644)
 
 	loadedContacts, err := loadContacts(tmpFile)
 	if err != nil {
 		t.Fatalf("loadContacts failed: %v", err)
 	}
 
-	if loadedContacts[0].Phone.Type != "cell" {
-		t.Errorf("Mobile not migrated to cell, got %q", loadedContacts[0].Phone.Type)
+	if len(loadedContacts[0].Phones) == 0 || loadedContacts[0].Phones[0].Type != "cell" {
+		t.Errorf("Mobile not migrated to cell")
 	}
-	if loadedContacts[1].Phone.Type != "work" {
-		t.Errorf("Work not migrated to work, got %q", loadedContacts[1].Phone.Type)
+	if len(loadedContacts[1].Phones) == 0 || loadedContacts[1].Phones[0].Type != "work" {
+		t.Errorf("Work not migrated to work")
 	}
-	if loadedContacts[2].Phone.Type != "cell" {
-		t.Errorf("Empty type not defaulted to cell, got %q", loadedContacts[2].Phone.Type)
+	if len(loadedContacts[2].Phones) == 0 || loadedContacts[2].Phones[0].Type != "cell" {
+		t.Errorf("Empty type not defaulted to cell")
 	}
 }
 
@@ -297,8 +300,8 @@ END:VCARD`
 	if contacts[0].LastName != "Doe" {
 		t.Errorf("contact[0].LastName = %q, want %q", contacts[0].LastName, "Doe")
 	}
-	if contacts[0].Phone.PhoneNumber != "+49 151 12345678" {
-		t.Errorf("contact[0].PhoneNumber = %q, want %q", contacts[0].Phone.PhoneNumber, "+49 151 12345678")
+	if len(contacts[0].Phones) == 0 || contacts[0].Phones[0].PhoneNumber != "+49 151 12345678" {
+		t.Errorf("contact[0].PhoneNumber = %q, want %q", contacts[0].Phones[0].PhoneNumber, "+49 151 12345678")
 	}
 
 	if contacts[1].FirstName != "Jane" {
@@ -542,8 +545,7 @@ func TestWebEditHandlerPOST(t *testing.T) {
 	form := url.Values{}
 	form.Add("firstName", "New")
 	form.Add("lastName", "Contact")
-	form.Add("phoneNumber", "+49 151 99999999")
-	form.Add("phoneType", "cell")
+	form.Add("phoneMobile", "+49 151 99999999")
 
 	req := httptest.NewRequest("POST", "/contacts/edit", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -653,10 +655,12 @@ func TestNormalizeAllHandler(t *testing.T) {
 		{
 			FirstName: "Test",
 			LastName:  "User",
-			Phone: Phone{
-				Type:         "cell",
-				PhoneNumber:  "0151 12345678",
-				AccountIndex: 0,
+			Phones: []Phone{
+				{
+					Type:         "cell",
+					PhoneNumber:  "0151 12345678",
+					AccountIndex: 0,
+				},
 			},
 			Groups: Groups{GroupID: 1},
 		},
@@ -673,8 +677,8 @@ func TestNormalizeAllHandler(t *testing.T) {
 	}
 
 	contacts, _ := loadContacts(tmpFile)
-	if contacts[0].Phone.PhoneNumber != "+49 151 12345678" {
-		t.Errorf("normalized phone = %q, want %q", contacts[0].Phone.PhoneNumber, "+49 151 12345678")
+	if len(contacts[0].Phones) == 0 || contacts[0].Phones[0].PhoneNumber != "+49 151 12345678" {
+		t.Errorf("normalized phone = %q, want %q", contacts[0].Phones[0].PhoneNumber, "+49 151 12345678")
 	}
 }
 
@@ -912,10 +916,12 @@ func TestSyncedContactsCannotBeEdited(t *testing.T) {
 		{
 			FirstName: "Synced",
 			LastName:  "Contact",
-			Phone: Phone{
-				Type:         "cell",
-				PhoneNumber:  "+49 151 12345678",
-				AccountIndex: 0,
+			Phones: []Phone{
+				{
+					Type:         "cell",
+					PhoneNumber:  "+49 151 12345678",
+					AccountIndex: 0,
+				},
 			},
 			Groups: Groups{GroupID: 1},
 			Source: "carddav:Test Source", // Synced contacts have a source
@@ -928,8 +934,7 @@ func TestSyncedContactsCannotBeEdited(t *testing.T) {
 	form.Add("id", "0")
 	form.Add("firstName", "Modified")
 	form.Add("lastName", "Contact")
-	form.Add("phoneNumber", "+49 151 99999999")
-	form.Add("phoneType", "cell")
+	form.Add("phoneMobile", "+49 151 99999999")
 
 	req := httptest.NewRequest("POST", "/contacts/edit", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1026,8 +1031,7 @@ func TestManualContactsNotSynced(t *testing.T) {
 	form := url.Values{}
 	form.Add("firstName", "Manual")
 	form.Add("lastName", "Contact")
-	form.Add("phoneNumber", "+49 151 12345678")
-	form.Add("phoneType", "cell")
+	form.Add("phoneMobile", "+49 151 12345678")
 
 	req := httptest.NewRequest("POST", "/contacts/edit", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1044,4 +1048,107 @@ func TestManualContactsNotSynced(t *testing.T) {
 		t.Errorf("manually created contact should not have source, got: %q", contacts[0].Source)
 	}
 }
+
+// Test multiple phone numbers per contact
+func TestMultiplePhoneNumbers(t *testing.T) {
+	tmpFile := "test_multiple_phones.json"
+	defer os.Remove(tmpFile)
+
+	// Create contact with all three phone types
+	contacts := []Contact{
+		{
+			FirstName: "Multi",
+			LastName:  "Phone",
+			Phones: []Phone{
+				{Type: "cell", PhoneNumber: "+49 151 1111111", AccountIndex: 0},
+				{Type: "home", PhoneNumber: "+49 711 2222222", AccountIndex: 0},
+				{Type: "work", PhoneNumber: "+49 30 3333333", AccountIndex: 0},
+			},
+			Groups: Groups{GroupID: 1},
+		},
+	}
+
+	if err := saveContacts(tmpFile, contacts); err != nil {
+		t.Fatalf("saveContacts failed: %v", err)
+	}
+
+	// Load and verify
+	loaded, err := loadContacts(tmpFile)
+	if err != nil {
+		t.Fatalf("loadContacts failed: %v", err)
+	}
+
+	if len(loaded) != 1 {
+		t.Fatalf("expected 1 contact, got %d", len(loaded))
+	}
+
+	if len(loaded[0].Phones) != 3 {
+		t.Fatalf("expected 3 phones, got %d", len(loaded[0].Phones))
+	}
+
+	// Verify each phone type
+	foundCell, foundHome, foundWork := false, false, false
+	for _, phone := range loaded[0].Phones {
+		switch phone.Type {
+		case "cell":
+			foundCell = true
+			if phone.PhoneNumber != "+49 151 1111111" {
+				t.Errorf("cell phone = %q, want %q", phone.PhoneNumber, "+49 151 1111111")
+			}
+		case "home":
+			foundHome = true
+			if phone.PhoneNumber != "+49 711 2222222" {
+				t.Errorf("home phone = %q, want %q", phone.PhoneNumber, "+49 711 2222222")
+			}
+		case "work":
+			foundWork = true
+			if phone.PhoneNumber != "+49 30 3333333" {
+				t.Errorf("work phone = %q, want %q", phone.PhoneNumber, "+49 30 3333333")
+			}
+		}
+	}
+
+	if !foundCell || !foundHome || !foundWork {
+		t.Errorf("missing phone types: cell=%v, home=%v, work=%v", foundCell, foundHome, foundWork)
+	}
+}
+
+// Test XML output with multiple phones
+func TestXMLWithMultiplePhones(t *testing.T) {
+	contact := Contact{
+		FirstName: "Test",
+		LastName:  "User",
+		Phones: []Phone{
+			{Type: "cell", PhoneNumber: "+49 151 1111111", AccountIndex: 0},
+			{Type: "home", PhoneNumber: "+49 711 2222222", AccountIndex: 0},
+		},
+		Groups: Groups{GroupID: 1},
+	}
+
+	addressBook := AddressBook{
+		Contacts: []Contact{contact},
+	}
+
+	xmlData, err := xml.MarshalIndent(addressBook, "", "  ")
+	if err != nil {
+		t.Fatalf("XML marshal failed: %v", err)
+	}
+
+	xmlStr := string(xmlData)
+	
+	// Check that both phones are in XML
+	if !strings.Contains(xmlStr, `type="cell"`) {
+		t.Error("XML missing cell phone type")
+	}
+	if !strings.Contains(xmlStr, `type="home"`) {
+		t.Error("XML missing home phone type")
+	}
+	if !strings.Contains(xmlStr, "+49 151 1111111") {
+		t.Error("XML missing cell phone number")
+	}
+	if !strings.Contains(xmlStr, "+49 711 2222222") {
+		t.Error("XML missing home phone number")
+	}
+}
+
 

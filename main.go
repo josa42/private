@@ -52,7 +52,7 @@ type Contact struct {
 	LastName    string   `xml:"LastName,omitempty" json:"lastName,omitempty"`
 	FirstName   string   `xml:"FirstName,omitempty" json:"firstName,omitempty"`
 	CompanyName string   `xml:"Company,omitempty" json:"companyName,omitempty"`
-	Phone       Phone    `xml:"Phone" json:"phone"`
+	Phones      []Phone  `xml:"Phone" json:"phones,omitempty"`
 	Groups      Groups   `xml:"Groups" json:"groups"`
 	Source      string   `xml:"-" json:"source,omitempty"` // e.g. "carddav:iCloud Familie"
 }
@@ -238,24 +238,82 @@ func loadContacts(filename string) ([]Contact, error) {
 		return nil, err
 	}
 
+	// Try loading as new format first
 	var contacts []Contact
 	if err := json.Unmarshal(data, &contacts); err != nil {
 		return nil, err
 	}
 
-	// Set default type for contacts without type
+	// Migrate old single phone format to new multiple phones format
 	for i := range contacts {
-		if contacts[i].Phone.Type == "" {
-			contacts[i].Phone.Type = "cell"
+		// Check if old format (single phone field exists but phones is empty)
+		var oldContact struct {
+			Phone Phone `json:"phone"`
 		}
-		// Migrate old values to lowercase
-		switch contacts[i].Phone.Type {
-		case "Mobile":
-			contacts[i].Phone.Type = "cell"
-		case "Work":
-			contacts[i].Phone.Type = "work"
-		case "Home":
-			contacts[i].Phone.Type = "home"
+		if err := json.Unmarshal(data, &[]interface{}{&oldContact}); err == nil {
+			if len(contacts[i].Phones) == 0 {
+				// Try to unmarshal the old "phone" field
+				var rawContact map[string]interface{}
+				contactData, _ := json.Marshal(map[string]interface{}{
+					"lastName":    contacts[i].LastName,
+					"firstName":   contacts[i].FirstName,
+					"companyName": contacts[i].CompanyName,
+					"groups":      contacts[i].Groups,
+					"source":      contacts[i].Source,
+				})
+				json.Unmarshal(contactData, &rawContact)
+				
+				// Check if the original data has "phone" field
+				var originalContacts []map[string]interface{}
+				json.Unmarshal(data, &originalContacts)
+				if i < len(originalContacts) {
+					if phoneData, ok := originalContacts[i]["phone"].(map[string]interface{}); ok {
+						phone := Phone{}
+						if phoneNum, ok := phoneData["phoneNumber"].(string); ok {
+							phone.PhoneNumber = phoneNum
+						}
+						if phoneType, ok := phoneData["type"].(string); ok {
+							phone.Type = phoneType
+						}
+						if accountIdx, ok := phoneData["accountIndex"].(float64); ok {
+							phone.AccountIndex = int(accountIdx)
+						}
+						
+						// Migrate old type values
+						if phone.Type == "" {
+							phone.Type = "cell"
+						}
+						switch phone.Type {
+						case "Mobile":
+							phone.Type = "cell"
+						case "Work":
+							phone.Type = "work"
+						case "Home":
+							phone.Type = "home"
+						}
+						
+						if phone.PhoneNumber != "" {
+							contacts[i].Phones = []Phone{phone}
+						}
+					}
+				}
+			}
+		}
+		
+		// Set default type for phones without type
+		for j := range contacts[i].Phones {
+			if contacts[i].Phones[j].Type == "" {
+				contacts[i].Phones[j].Type = "cell"
+			}
+			// Migrate old values to lowercase
+			switch contacts[i].Phones[j].Type {
+			case "Mobile":
+				contacts[i].Phones[j].Type = "cell"
+			case "Work":
+				contacts[i].Phones[j].Type = "work"
+			case "Home":
+				contacts[i].Phones[j].Type = "home"
+			}
 		}
 	}
 
@@ -356,7 +414,10 @@ func getContactDisplayName(c Contact) string {
 	if c.FirstName != "" || c.LastName != "" {
 		return c.FirstName + " " + c.LastName
 	}
-	return c.Phone.PhoneNumber
+	if len(c.Phones) > 0 {
+		return c.Phones[0].PhoneNumber
+	}
+	return ""
 }
 
 func normalizePhoneNumber(phone string) string {
@@ -423,7 +484,9 @@ func normalizeAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Normalize all phone numbers
 	for i := range contacts {
-		contacts[i].Phone.PhoneNumber = normalizePhoneNumber(contacts[i].Phone.PhoneNumber)
+		for j := range contacts[i].Phones {
+			contacts[i].Phones[j].PhoneNumber = normalizePhoneNumber(contacts[i].Phones[j].PhoneNumber)
+		}
 	}
 
 	if err := saveContacts(dataDir+"/contacts.json", contacts); err != nil {
@@ -445,15 +508,13 @@ func parseVCard(vcardData string) []Contact {
 		
 		if line == "BEGIN:VCARD" {
 			currentContact = &Contact{
-				Phone: Phone{
-					AccountIndex: 0,
-				},
+				Phones: []Phone{},
 				Groups: Groups{
 					GroupID: 1,
 				},
 			}
 		} else if line == "END:VCARD" {
-			if currentContact != nil && currentContact.Phone.PhoneNumber != "" {
+			if currentContact != nil && len(currentContact.Phones) > 0 {
 				contacts = append(contacts, *currentContact)
 			}
 			currentContact = nil
@@ -480,8 +541,13 @@ func parseVCard(vcardData string) []Contact {
 				} else if strings.HasPrefix(key, "TEL") {
 					phone := strings.TrimSpace(value)
 					phone = normalizePhoneNumber(phone)
-					if currentContact.Phone.PhoneNumber == "" {
-						currentContact.Phone.PhoneNumber = phone
+					// Add the first phone we find
+					if len(currentContact.Phones) == 0 {
+						currentContact.Phones = append(currentContact.Phones, Phone{
+							PhoneNumber:  phone,
+							Type:         "cell",
+							AccountIndex: 0,
+						})
 					}
 				}
 			}
@@ -744,7 +810,7 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 		processedCount++
 		
 		contact := vCardToContactWithFilter(obj.Card, phoneFilterExclude)
-		if contact.Phone.PhoneNumber != "" {
+		if len(contact.Phones) > 0 {
 			contacts = append(contacts, contact)
 		} else {
 			noPhoneCount++
@@ -801,9 +867,7 @@ func vCardToContact(card vcard.Card) Contact {
 
 func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Contact {
 	contact := Contact{
-		Phone: Phone{
-			AccountIndex: 0,
-		},
+		Phones: []Phone{},
 		Groups: Groups{
 			GroupID: 1,
 		},
@@ -837,30 +901,17 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 		contact.CompanyName = orgs[0]
 	}
 
-	// Get phone number - skip numbers with excluded labels
-	// Prioritize mobile numbers over landline
-	// Access TEL fields directly from card map to get parameters
-	var selectedPhone string
-	var phoneType string
-	var mobilePhone string
-	var landlinePhone string
+	// Get phone numbers - collect mobile, home, and work
+	// Skip numbers with excluded labels
+	var mobilePhone, homePhone, workPhone string
 	
-	// Debug: Show filter config
 	contactName := card.PreferredValue(vcard.FieldFormattedName)
-	if len(phoneFilterExclude) > 0 {
-		log.Printf("CardDAV DEBUG: Processing contact '%s' with filters: %v", contactName, phoneFilterExclude)
-	}
 	
 	if telFields, ok := card[vcard.FieldTelephone]; ok {
-		log.Printf("CardDAV DEBUG: Contact '%s' has %d TEL field(s)", contactName, len(telFields))
-		
-		for i, field := range telFields {
+		for _, field := range telFields {
 			if field.Value == "" {
 				continue
 			}
-			
-			// Debug: Show all params
-			log.Printf("CardDAV DEBUG: TEL[%d] Value='%s', Params=%+v", i, field.Value, field.Params)
 			
 			// Check if this phone should be excluded by label
 			shouldSkip := false
@@ -870,44 +921,34 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 				// Check all possible label locations:
 				// 1. X-ABLABEL (iOS/iCloud custom labels)
 				// 2. LABEL parameter (standard vCard)
-				// 3. Inside TYPE parameter values (some systems)
-				// 4. Group-based labels (item1.X-ABLABEL)
+				// 3. Group-based labels (item1.X-ABLABEL)
 				
 				// Method 1: X-ABLABEL parameter
 				if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
 					label = labelParam[0]
-					log.Printf("CardDAV DEBUG: Found X-ABLABEL: '%s'", label)
 				}
 				
 				// Method 2: LABEL parameter
 				if labelParam, ok := field.Params["LABEL"]; ok && len(labelParam) > 0 {
 					label = labelParam[0]
-					log.Printf("CardDAV DEBUG: Found LABEL: '%s'", label)
 				}
 				
 				// Method 3: Check field.Group for item-based labels
 				// iCloud stores labels as separate X-ABLABEL fields with the same Group
 				if field.Group != "" && label == "" {
-					log.Printf("CardDAV DEBUG: Field has Group: '%s'", field.Group)
 					// Look for X-ABLABEL field with matching group
 					if xAbLabelFields, ok := card["X-ABLABEL"]; ok {
 						for _, labelField := range xAbLabelFields {
 							if labelField.Group == field.Group {
 								label = labelField.Value
-								log.Printf("CardDAV DEBUG: Found group label for '%s': '%s'", field.Group, label)
 								break
 							}
 						}
-					}
-					if label == "" {
-						log.Printf("CardDAV DEBUG: No X-ABLABEL found for group '%s'", field.Group)
 					}
 				}
 				
 				// Check label against exclusion patterns
 				for _, excludePattern := range phoneFilterExclude {
-					log.Printf("CardDAV DEBUG: Checking if label '%s' contains '%s'", 
-						label, excludePattern)
 					if strings.Contains(label, excludePattern) {
 						shouldSkip = true
 						log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - label contains '%s'", 
@@ -921,53 +962,62 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 				continue
 			}
 			
-			// Determine if this is a mobile or landline number
-			// Check TYPE parameter for CELL or VOICE
-			isMobile := false
+			// Determine phone type from TYPE parameter
+			phoneType := ""
 			if typeParams, ok := field.Params["TYPE"]; ok {
 				for _, t := range typeParams {
 					typeUpper := strings.ToUpper(t)
 					if typeUpper == "CELL" || typeUpper == "MOBILE" {
-						isMobile = true
+						phoneType = "cell"
+						break
+					} else if typeUpper == "HOME" {
+						phoneType = "home"
+						break
+					} else if typeUpper == "WORK" {
+						phoneType = "work"
 						break
 					}
 				}
 			}
 			
-			// Store the first mobile and first landline
-			if isMobile && mobilePhone == "" {
+			// Store by type (one of each)
+			if phoneType == "cell" && mobilePhone == "" {
 				mobilePhone = field.Value
-				log.Printf("CardDAV DEBUG: Found mobile phone '%s' (label: '%s') for contact '%s'", 
-					field.Value, label, contactName)
-			} else if !isMobile && landlinePhone == "" {
-				landlinePhone = field.Value
-				log.Printf("CardDAV DEBUG: Found landline phone '%s' (label: '%s') for contact '%s'", 
-					field.Value, label, contactName)
+			} else if phoneType == "home" && homePhone == "" {
+				homePhone = field.Value
+			} else if phoneType == "work" && workPhone == "" {
+				workPhone = field.Value
+			} else if phoneType == "" && mobilePhone == "" {
+				// Default unknown types to mobile
+				mobilePhone = field.Value
 			}
-			
-			// Stop after finding both mobile and landline
-			if mobilePhone != "" && landlinePhone != "" {
-				break
-			}
-		}
-		
-		// Prefer mobile over landline
-		if mobilePhone != "" {
-			selectedPhone = mobilePhone
-			phoneType = "cell"
-			log.Printf("CardDAV: Selected mobile phone '%s' for contact '%s'", selectedPhone, contactName)
-		} else if landlinePhone != "" {
-			selectedPhone = landlinePhone
-			phoneType = "cell"
-			log.Printf("CardDAV: Selected landline phone '%s' for contact '%s'", selectedPhone, contactName)
 		}
 	}
 
-	if selectedPhone != "" {
-		// Normalize phone number
-		selectedPhone = normalizePhoneNumber(selectedPhone)
-		contact.Phone.PhoneNumber = selectedPhone
-		contact.Phone.Type = phoneType
+	// Build phones array
+	if mobilePhone != "" {
+		contact.Phones = append(contact.Phones, Phone{
+			PhoneNumber:  normalizePhoneNumber(mobilePhone),
+			Type:         "cell",
+			AccountIndex: 0,
+		})
+		log.Printf("CardDAV: Added mobile phone for contact '%s'", contactName)
+	}
+	if homePhone != "" {
+		contact.Phones = append(contact.Phones, Phone{
+			PhoneNumber:  normalizePhoneNumber(homePhone),
+			Type:         "home",
+			AccountIndex: 0,
+		})
+		log.Printf("CardDAV: Added home phone for contact '%s'", contactName)
+	}
+	if workPhone != "" {
+		contact.Phones = append(contact.Phones, Phone{
+			PhoneNumber:  normalizePhoneNumber(workPhone),
+			Type:         "work",
+			AccountIndex: 0,
+		})
+		log.Printf("CardDAV: Added work phone for contact '%s'", contactName)
 	}
 
 	return contact
@@ -1083,18 +1133,45 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		firstName := r.FormValue("firstName")
 		lastName := r.FormValue("lastName")
 		companyName := r.FormValue("companyName")
-		phoneNumber := normalizePhoneNumber(r.FormValue("phoneNumber"))
-		phoneType := r.FormValue("phoneType")
+		phoneMobile := normalizePhoneNumber(r.FormValue("phoneMobile"))
+		phoneHome := normalizePhoneNumber(r.FormValue("phoneHome"))
+		phoneWork := normalizePhoneNumber(r.FormValue("phoneWork"))
+
+		// Build phones array
+		var phones []Phone
+		if phoneMobile != "" {
+			phones = append(phones, Phone{
+				Type:         "cell",
+				PhoneNumber:  phoneMobile,
+				AccountIndex: 0,
+			})
+		}
+		if phoneHome != "" {
+			phones = append(phones, Phone{
+				Type:         "home",
+				PhoneNumber:  phoneHome,
+				AccountIndex: 0,
+			})
+		}
+		if phoneWork != "" {
+			phones = append(phones, Phone{
+				Type:         "work",
+				PhoneNumber:  phoneWork,
+				AccountIndex: 0,
+			})
+		}
+
+		// Require at least one phone number
+		if len(phones) == 0 {
+			http.Error(w, "At least one phone number is required", http.StatusBadRequest)
+			return
+		}
 
 		contact := Contact{
 			FirstName:   firstName,
 			LastName:    lastName,
 			CompanyName: companyName,
-			Phone: Phone{
-				Type:         phoneType,
-				PhoneNumber:  phoneNumber,
-				AccountIndex: 0,
-			},
+			Phones:      phones,
 			Groups: Groups{
 				GroupID: 1,
 			},
