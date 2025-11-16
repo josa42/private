@@ -1209,6 +1209,7 @@ func addUser(credentials string) error {
 func main() {
 	addUserFlag := flag.String("add-user", "", "Add a new user (format: username:password)")
 	dataDirFlag := flag.String("data-dir", ".", "Directory for contacts and users files (default: current directory)")
+	portFlag := flag.Int("port", 8080, "Port to listen on (default: 8080)")
 	flag.Parse()
 
 	dataDir = *dataDirFlag
@@ -1235,7 +1236,7 @@ func main() {
 
 	loggedMux := loggingMiddleware(mux)
 
-	port := ":8081"
+	port := fmt.Sprintf(":%d", *portFlag)
 	log.Printf("Starting server on http://localhost%s", port)
 
 	if err := http.ListenAndServe(port, loggedMux); err != nil {
