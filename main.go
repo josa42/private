@@ -902,13 +902,21 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 				}
 				
 				// Method 4: Check field.Group for item-based labels
-				if field.Group != "" {
+				// iCloud stores labels as separate X-ABLABEL fields with the same Group
+				if field.Group != "" && label == "" {
 					log.Printf("CardDAV DEBUG: Field has Group: '%s'", field.Group)
-					// Look for item1.X-ABLABEL in the card
-					groupLabel := field.Group + ".X-ABLABEL"
-					if groupFields, ok := card[groupLabel]; ok && len(groupFields) > 0 {
-						label = groupFields[0].Value
-						log.Printf("CardDAV DEBUG: Found group label '%s': '%s'", groupLabel, label)
+					// Look for X-ABLABEL field with matching group
+					if xAbLabelFields, ok := card["X-ABLABEL"]; ok {
+						for _, labelField := range xAbLabelFields {
+							if labelField.Group == field.Group {
+								label = labelField.Value
+								log.Printf("CardDAV DEBUG: Found group label for '%s': '%s'", field.Group, label)
+								break
+							}
+						}
+					}
+					if label == "" {
+						log.Printf("CardDAV DEBUG: No X-ABLABEL found for group '%s'", field.Group)
 					}
 				}
 				
