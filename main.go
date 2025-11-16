@@ -864,27 +864,69 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 			// Check if this phone should be excluded by label
 			shouldSkip := false
 			if len(phoneFilterExclude) > 0 {
-				// Check X-ABLABEL (iOS/iCloud) or LABEL parameter
+				// Check all possible label locations:
+				// 1. X-ABLABEL (iOS/iCloud custom labels)
+				// 2. LABEL parameter (standard vCard)
+				// 3. Inside TYPE parameter values (some systems)
+				// 4. Group-based labels (item1.X-ABLABEL)
 				label := ""
+				
+				// Method 1: X-ABLABEL parameter
 				if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
 					label = labelParam[0]
 					log.Printf("CardDAV DEBUG: Found X-ABLABEL: '%s'", label)
 				}
+				
+				// Method 2: LABEL parameter
 				if labelParam, ok := field.Params["LABEL"]; ok && len(labelParam) > 0 {
 					label = labelParam[0]
 					log.Printf("CardDAV DEBUG: Found LABEL: '%s'", label)
 				}
 				
-				// Check if label or value contains any exclusion pattern
-				for _, excludePattern := range phoneFilterExclude {
-					log.Printf("CardDAV DEBUG: Checking if label '%s' or value '%s' contains '%s'", 
-						label, field.Value, excludePattern)
-					if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
-						shouldSkip = true
-						log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - contains '%s'", 
-							field.Value, label, contactName, excludePattern)
-						break
+				// Method 3: Check all TYPE values
+				if typeParams, ok := field.Params["TYPE"]; ok {
+					for _, typeVal := range typeParams {
+						// Check if any TYPE value contains our exclusion pattern
+						for _, excludePattern := range phoneFilterExclude {
+							if strings.Contains(typeVal, excludePattern) {
+								label = typeVal
+								log.Printf("CardDAV DEBUG: Found pattern '%s' in TYPE value: '%s'", excludePattern, typeVal)
+								shouldSkip = true
+								break
+							}
+						}
+						if shouldSkip {
+							break
+						}
 					}
+				}
+				
+				// Method 4: Check field.Group for item-based labels
+				if field.Group != "" {
+					log.Printf("CardDAV DEBUG: Field has Group: '%s'", field.Group)
+					// Look for item1.X-ABLABEL in the card
+					groupLabel := field.Group + ".X-ABLABEL"
+					if groupFields, ok := card[groupLabel]; ok && len(groupFields) > 0 {
+						label = groupFields[0].Value
+						log.Printf("CardDAV DEBUG: Found group label '%s': '%s'", groupLabel, label)
+					}
+				}
+				
+				// Now check label against exclusion patterns (if not already skipped)
+				if !shouldSkip {
+					for _, excludePattern := range phoneFilterExclude {
+						log.Printf("CardDAV DEBUG: Checking if label '%s' or value '%s' contains '%s'", 
+							label, field.Value, excludePattern)
+						if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
+							shouldSkip = true
+							log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - contains '%s'", 
+								field.Value, label, contactName, excludePattern)
+							break
+						}
+					}
+				} else {
+					log.Printf("CardDAV: Skipping phone '%s' for contact '%s' - TYPE contains exclusion pattern", 
+						field.Value, contactName)
 				}
 			}
 			
