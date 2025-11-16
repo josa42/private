@@ -745,46 +745,7 @@ func importFromCardDAVWithClient(ctx context.Context, client *carddav.Client, ad
 
 		processedCount++
 		
-		// Check phone labels for exclusion filter BEFORE converting
-		shouldExcludeByLabel := false
-		if len(phoneFilterExclude) > 0 {
-			// Card is a map[string][]*Field, access TEL fields directly
-			if telFields, ok := obj.Card[vcard.FieldTelephone]; ok {
-				for _, field := range telFields {
-					// Check X-ABLABEL (iOS/iCloud) or LABEL parameter
-					label := ""
-					if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
-						label = labelParam[0]
-					}
-					if labelParam, ok := field.Params["LABEL"]; ok && len(labelParam) > 0 {
-						label = labelParam[0]
-					}
-					
-					// Check if label or value contains any exclusion pattern
-					for _, excludePattern := range phoneFilterExclude {
-						if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
-							shouldExcludeByLabel = true
-							// Get contact name for logging
-							fn := obj.Card.PreferredValue(vcard.FieldFormattedName)
-							if fn == "" {
-								fn = field.Value
-							}
-							log.Printf("CardDAV: Excluding contact '%s' (phone label/value contains '%s')", fn, excludePattern)
-							break
-						}
-					}
-					if shouldExcludeByLabel {
-						break
-					}
-				}
-			}
-		}
-		
-		if shouldExcludeByLabel {
-			continue
-		}
-		
-		contact := vCardToContact(obj.Card)
+		contact := vCardToContactWithFilter(obj.Card, phoneFilterExclude)
 		if contact.Phone.PhoneNumber != "" {
 			contacts = append(contacts, contact)
 		} else {
@@ -837,6 +798,10 @@ func extractUIDFromMember(member string) string {
 }
 
 func vCardToContact(card vcard.Card) Contact {
+	return vCardToContactWithFilter(card, nil)
+}
+
+func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Contact {
 	contact := Contact{
 		Phone: Phone{
 			AccountIndex: 0,
@@ -874,20 +839,58 @@ func vCardToContact(card vcard.Card) Contact {
 		contact.CompanyName = orgs[0]
 	}
 
-	// Get phone number (prefer mobile, then work, then any)
-	phones := card.Values(vcard.FieldTelephone)
+	// Get phone number - skip numbers with excluded labels
+	// Access TEL fields directly from card map to get parameters
 	var selectedPhone string
 	var phoneType string
-
-	for _, phone := range phones {
-		if phone == "" {
-			continue
-		}
-
-		// Use the first phone we find and default to "cell" type
-		if selectedPhone == "" {
-			selectedPhone = phone
-			phoneType = "cell"
+	
+	if telFields, ok := card[vcard.FieldTelephone]; ok {
+		for _, field := range telFields {
+			if field.Value == "" {
+				continue
+			}
+			
+			// Check if this phone should be excluded by label
+			shouldSkip := false
+			if len(phoneFilterExclude) > 0 {
+				// Check X-ABLABEL (iOS/iCloud) or LABEL parameter
+				label := ""
+				if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
+					label = labelParam[0]
+				}
+				if labelParam, ok := field.Params["LABEL"]; ok && len(labelParam) > 0 {
+					label = labelParam[0]
+				}
+				
+				// Check if label or value contains any exclusion pattern
+				for _, excludePattern := range phoneFilterExclude {
+					if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
+						shouldSkip = true
+						// Debug log
+						fn := card.PreferredValue(vcard.FieldFormattedName)
+						log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - contains '%s'", 
+							field.Value, label, fn, excludePattern)
+						break
+					}
+				}
+			}
+			
+			// Use the first phone that isn't excluded
+			if !shouldSkip && selectedPhone == "" {
+				selectedPhone = field.Value
+				phoneType = "cell"
+				
+				// Log which phone was selected if filtering was active
+				if len(phoneFilterExclude) > 0 {
+					fn := card.PreferredValue(vcard.FieldFormattedName)
+					label := ""
+					if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
+						label = labelParam[0]
+					}
+					log.Printf("CardDAV: Selected phone '%s' (label: '%s') for contact '%s'", 
+						field.Value, label, fn)
+				}
+			}
 		}
 	}
 
