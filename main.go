@@ -838,9 +838,12 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 	}
 
 	// Get phone number - skip numbers with excluded labels
+	// Prioritize mobile numbers over landline
 	// Access TEL fields directly from card map to get parameters
 	var selectedPhone string
 	var phoneType string
+	var mobilePhone string
+	var landlinePhone string
 	
 	// Debug: Show filter config
 	contactName := card.PreferredValue(vcard.FieldFormattedName)
@@ -861,13 +864,14 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 			
 			// Check if this phone should be excluded by label
 			shouldSkip := false
+			label := ""
+			
 			if len(phoneFilterExclude) > 0 {
 				// Check all possible label locations:
 				// 1. X-ABLABEL (iOS/iCloud custom labels)
 				// 2. LABEL parameter (standard vCard)
 				// 3. Inside TYPE parameter values (some systems)
 				// 4. Group-based labels (item1.X-ABLABEL)
-				label := ""
 				
 				// Method 1: X-ABLABEL parameter
 				if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
@@ -913,21 +917,49 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 				}
 			}
 			
-			// Use the first phone that isn't excluded
-			if !shouldSkip && selectedPhone == "" {
-				selectedPhone = field.Value
-				phoneType = "cell"
-				
-				// Log which phone was selected if filtering was active
-				if len(phoneFilterExclude) > 0 {
-					label := ""
-					if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
-						label = labelParam[0]
+			if shouldSkip {
+				continue
+			}
+			
+			// Determine if this is a mobile or landline number
+			// Check TYPE parameter for CELL or VOICE
+			isMobile := false
+			if typeParams, ok := field.Params["TYPE"]; ok {
+				for _, t := range typeParams {
+					typeUpper := strings.ToUpper(t)
+					if typeUpper == "CELL" || typeUpper == "MOBILE" {
+						isMobile = true
+						break
 					}
-					log.Printf("CardDAV: Selected phone '%s' (label: '%s') for contact '%s'", 
-						field.Value, label, contactName)
 				}
 			}
+			
+			// Store the first mobile and first landline
+			if isMobile && mobilePhone == "" {
+				mobilePhone = field.Value
+				log.Printf("CardDAV DEBUG: Found mobile phone '%s' (label: '%s') for contact '%s'", 
+					field.Value, label, contactName)
+			} else if !isMobile && landlinePhone == "" {
+				landlinePhone = field.Value
+				log.Printf("CardDAV DEBUG: Found landline phone '%s' (label: '%s') for contact '%s'", 
+					field.Value, label, contactName)
+			}
+			
+			// Stop after finding both mobile and landline
+			if mobilePhone != "" && landlinePhone != "" {
+				break
+			}
+		}
+		
+		// Prefer mobile over landline
+		if mobilePhone != "" {
+			selectedPhone = mobilePhone
+			phoneType = "cell"
+			log.Printf("CardDAV: Selected mobile phone '%s' for contact '%s'", selectedPhone, contactName)
+		} else if landlinePhone != "" {
+			selectedPhone = landlinePhone
+			phoneType = "cell"
+			log.Printf("CardDAV: Selected landline phone '%s' for contact '%s'", selectedPhone, contactName)
 		}
 	}
 
