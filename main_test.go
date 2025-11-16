@@ -645,43 +645,6 @@ END:VCARD`
 	}
 }
 
-// Test HTTP handler: normalizeAllHandler
-func TestNormalizeAllHandler(t *testing.T) {
-	tmpFile := "contacts.json"
-	originalData, _ := os.ReadFile(tmpFile)
-	defer os.WriteFile(tmpFile, originalData, 0644)
-
-	testContacts := []Contact{
-		{
-			FirstName: "Test",
-			LastName:  "User",
-			Phones: []Phone{
-				{
-					Type:         "cell",
-					PhoneNumber:  "0151 12345678",
-					AccountIndex: 0,
-				},
-			},
-			Groups: Groups{GroupID: 1},
-		},
-	}
-	saveContacts(tmpFile, testContacts)
-
-	req := httptest.NewRequest("POST", "/contacts/normalize", nil)
-	w := httptest.NewRecorder()
-
-	normalizeAllHandler(w, req)
-
-	if w.Result().StatusCode != http.StatusSeeOther {
-		t.Errorf("status = %d, want %d", w.Result().StatusCode, http.StatusSeeOther)
-	}
-
-	contacts, _ := loadContacts(tmpFile)
-	if len(contacts[0].Phones) == 0 || contacts[0].Phones[0].PhoneNumber != "+49 151 12345678" {
-		t.Errorf("normalized phone = %q, want %q", contacts[0].Phones[0].PhoneNumber, "+49 151 12345678")
-	}
-}
-
 // Test getSessionUser function
 func TestGetSessionUser(t *testing.T) {
 	sessions["valid-session"] = "testuser"

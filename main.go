@@ -498,27 +498,7 @@ func normalizePhoneNumber(phone string) string {
 	return formatted
 }
 
-func normalizeAllHandler(w http.ResponseWriter, r *http.Request) {
-	contacts, err := loadContacts(dataDir + "/contacts.json")
-	if err != nil {
-		http.Error(w, "Failed to load contacts", http.StatusInternalServerError)
-		return
-	}
 
-	// Normalize all phone numbers
-	for i := range contacts {
-		for j := range contacts[i].Phones {
-			contacts[i].Phones[j].PhoneNumber = normalizePhoneNumber(contacts[i].Phones[j].PhoneNumber)
-		}
-	}
-
-	if err := saveContacts(dataDir+"/contacts.json", contacts); err != nil {
-		http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
-		return
-	}
-
-	http.Redirect(w, r, "/contacts", http.StatusSeeOther)
-}
 
 func parseVCard(vcardData string) []Contact {
 	var contacts []Contact
@@ -1332,7 +1312,6 @@ func main() {
 	mux.HandleFunc("/contacts/new", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/import", authMiddleware(webImportHandler))
 	mux.HandleFunc("/contacts/sync-carddav", authMiddleware(webCardDAVSyncHandler))
-	mux.HandleFunc("/contacts/normalize", authMiddleware(normalizeAllHandler))
 
 	loggedMux := loggingMiddleware(mux)
 
