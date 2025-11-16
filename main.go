@@ -23,6 +23,7 @@ import (
 
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
+	"github.com/nyaruka/phonenumbers"
 )
 
 //go:embed templates/*
@@ -359,114 +360,58 @@ func getContactDisplayName(c Contact) string {
 }
 
 func normalizePhoneNumber(phone string) string {
-	// Remove all spaces and formatting
-	phone = strings.ReplaceAll(phone, " ", "")
-	phone = strings.ReplaceAll(phone, "-", "")
-	phone = strings.ReplaceAll(phone, "/", "")
-	phone = strings.ReplaceAll(phone, "(", "")
-	phone = strings.ReplaceAll(phone, ")", "")
-	
-	// Remove invalid characters (keep only digits and +)
-	var cleaned strings.Builder
-	for _, char := range phone {
-		if (char >= '0' && char <= '9') || char == '+' {
-			cleaned.WriteRune(char)
-		}
-	}
-	phone = cleaned.String()
-	
-	// Convert international prefix 00 to +
-	if strings.HasPrefix(phone, "00") {
-		phone = "+" + phone[2:]
+	if phone == "" {
+		return ""
 	}
 	
-	// German numbers: replace leading 0 with +49
-	if strings.HasPrefix(phone, "0") && !strings.HasPrefix(phone, "00") {
-		phone = "+49" + phone[1:]
+	// Parse phone number with German region as default
+	num, err := phonenumbers.Parse(phone, "DE")
+	if err != nil {
+		// If parsing fails, return original (cleaned of spaces)
+		log.Printf("Warning: Failed to parse phone number '%s': %v", phone, err)
+		return strings.ReplaceAll(phone, " ", "")
 	}
 	
-	// Format according to DIN 5008
-	// International format: +49 followed by area code and number with spaces
-	if strings.HasPrefix(phone, "+49") && len(phone) > 3 {
-		// +491234567890 -> +49 123 4567890
-		rest := phone[3:] // Everything after +49
+	// Format according to E.164 international format first
+	e164 := phonenumbers.Format(num, phonenumbers.E164)
+	
+	// Now format to international format with spaces (similar to DIN 5008)
+	// E.164: +4915112345678
+	// We want: +49 151 12345678
+	
+	// Use INTERNATIONAL format which adds spaces
+	formatted := phonenumbers.Format(num, phonenumbers.INTERNATIONAL)
+	
+	// The INTERNATIONAL format produces output like: +49 151 12345678
+	// which is close to DIN 5008
+	
+	// For consistency, ensure German numbers follow our preferred pattern
+	if strings.HasPrefix(e164, "+49") {
+		// Remove all spaces first
+		digitsOnly := strings.ReplaceAll(e164, " ", "")
 		
-		if len(rest) == 0 {
-			return phone
+		if len(digitsOnly) <= 3 {
+			return digitsOnly
 		}
+		
+		rest := digitsOnly[3:] // Everything after +49
 		
 		// Detect mobile numbers (15x, 16x, 17x)
-		isMobile := len(rest) >= 2 && (rest[0] == '1') && 
-			(rest[1] == '5' || rest[1] == '6' || rest[1] == '7')
-		
-		if isMobile {
-			// Mobile: +49 15x ... (3-digit prefix + rest)
+		if len(rest) >= 2 && rest[0] == '1' && (rest[1] == '5' || rest[1] == '6' || rest[1] == '7') {
+			// Mobile: +49 151 12345678
 			if len(rest) >= 3 {
-				prefix := rest[:3]    // 15x, 16x, 17x
-				number := rest[3:]    // Rest of the number
-				phone = "+49 " + prefix + " " + number
-			} else {
-				phone = "+49 " + rest
+				return "+49 " + rest[:3] + " " + rest[3:]
 			}
-		} else {
-			// Landline: separate area code from subscriber number
-			// Common area codes: 2-5 digits
-			// We'll use simple heuristic: if starts with single digit (2-9), 
-			// it's likely a major city (1-2 digit area code)
-			
-			var areaCode, subscriberNumber string
-			
-			// Major cities with short area codes
-			if rest[0] == '2' || rest[0] == '3' || rest[0] == '4' || 
-			   rest[0] == '5' || rest[0] == '6' || rest[0] == '7' || 
-			   rest[0] == '8' || rest[0] == '9' {
-				// Try to determine area code length by common patterns
-				if len(rest) >= 2 && (rest[0:2] == "30" || rest[0:2] == "40" || 
-					rest[0:2] == "69" || rest[0:2] == "89") {
-					// Major cities: Berlin (30), Hamburg (40), Frankfurt (69), München (89)
-					areaCode = rest[:2]
-					subscriberNumber = rest[2:]
-				} else if len(rest) >= 3 {
-					// Default: 3-digit area code
-					areaCode = rest[:3]
-					subscriberNumber = rest[3:]
-				} else {
-					areaCode = rest
-					subscriberNumber = ""
-				}
-			} else {
-				// Fallback
-				if len(rest) >= 3 {
-					areaCode = rest[:3]
-					subscriberNumber = rest[3:]
-				} else {
-					areaCode = rest
-					subscriberNumber = ""
-				}
-			}
-			
-			if subscriberNumber != "" {
-				phone = "+49 " + areaCode + " " + subscriberNumber
-			} else {
-				phone = "+49 " + areaCode
-			}
+			return "+49 " + rest
 		}
-	} else if strings.HasPrefix(phone, "+") {
-		// Other international numbers: +CC NNNN...
-		// Just add space after country code (first 2-3 digits)
-		if len(phone) > 3 {
-			// Simple format: +XX NNNN... or +XXX NNNN...
-			if phone[3] >= '0' && phone[3] <= '9' {
-				// 3-digit country code
-				phone = phone[:4] + " " + phone[4:]
-			} else {
-				// 2-digit country code  
-				phone = phone[:3] + " " + phone[3:]
-			}
-		}
+		
+		// For landlines, use the library's INTERNATIONAL format
+		// as it handles area codes correctly
+		return formatted
 	}
 	
-	return phone
+	// For non-German numbers, use library's INTERNATIONAL format
+	return formatted
 }
 
 func normalizeAllHandler(w http.ResponseWriter, r *http.Request) {
