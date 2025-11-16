@@ -844,11 +844,22 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 	var selectedPhone string
 	var phoneType string
 	
+	// Debug: Show filter config
+	contactName := card.PreferredValue(vcard.FieldFormattedName)
+	if len(phoneFilterExclude) > 0 {
+		log.Printf("CardDAV DEBUG: Processing contact '%s' with filters: %v", contactName, phoneFilterExclude)
+	}
+	
 	if telFields, ok := card[vcard.FieldTelephone]; ok {
-		for _, field := range telFields {
+		log.Printf("CardDAV DEBUG: Contact '%s' has %d TEL field(s)", contactName, len(telFields))
+		
+		for i, field := range telFields {
 			if field.Value == "" {
 				continue
 			}
+			
+			// Debug: Show all params
+			log.Printf("CardDAV DEBUG: TEL[%d] Value='%s', Params=%+v", i, field.Value, field.Params)
 			
 			// Check if this phone should be excluded by label
 			shouldSkip := false
@@ -857,19 +868,21 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 				label := ""
 				if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
 					label = labelParam[0]
+					log.Printf("CardDAV DEBUG: Found X-ABLABEL: '%s'", label)
 				}
 				if labelParam, ok := field.Params["LABEL"]; ok && len(labelParam) > 0 {
 					label = labelParam[0]
+					log.Printf("CardDAV DEBUG: Found LABEL: '%s'", label)
 				}
 				
 				// Check if label or value contains any exclusion pattern
 				for _, excludePattern := range phoneFilterExclude {
+					log.Printf("CardDAV DEBUG: Checking if label '%s' or value '%s' contains '%s'", 
+						label, field.Value, excludePattern)
 					if strings.Contains(label, excludePattern) || strings.Contains(field.Value, excludePattern) {
 						shouldSkip = true
-						// Debug log
-						fn := card.PreferredValue(vcard.FieldFormattedName)
 						log.Printf("CardDAV: Skipping phone '%s' (label: '%s') for contact '%s' - contains '%s'", 
-							field.Value, label, fn, excludePattern)
+							field.Value, label, contactName, excludePattern)
 						break
 					}
 				}
@@ -882,13 +895,12 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 				
 				// Log which phone was selected if filtering was active
 				if len(phoneFilterExclude) > 0 {
-					fn := card.PreferredValue(vcard.FieldFormattedName)
 					label := ""
 					if labelParam, ok := field.Params["X-ABLABEL"]; ok && len(labelParam) > 0 {
 						label = labelParam[0]
 					}
 					log.Printf("CardDAV: Selected phone '%s' (label: '%s') for contact '%s'", 
-						field.Value, label, fn)
+						field.Value, label, contactName)
 				}
 			}
 		}
