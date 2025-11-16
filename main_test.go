@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -274,56 +272,6 @@ func TestAuthenticateUser(t *testing.T) {
 	}
 }
 
-// Test parseVCard function
-func TestParseVCard(t *testing.T) {
-	vcardData := `BEGIN:VCARD
-VERSION:3.0
-FN:John Doe
-N:Doe;John;;;
-TEL;TYPE=CELL:+49 151 12345678
-END:VCARD
-BEGIN:VCARD
-VERSION:3.0
-FN:Jane Smith
-TEL:030-1234567
-END:VCARD`
-
-	contacts := parseVCard(vcardData)
-
-	if len(contacts) != 2 {
-		t.Fatalf("parseVCard returned %d contacts, want 2", len(contacts))
-	}
-
-	if contacts[0].FirstName != "John" {
-		t.Errorf("contact[0].FirstName = %q, want %q", contacts[0].FirstName, "John")
-	}
-	if contacts[0].LastName != "Doe" {
-		t.Errorf("contact[0].LastName = %q, want %q", contacts[0].LastName, "Doe")
-	}
-	if len(contacts[0].Phones) == 0 || contacts[0].Phones[0].PhoneNumber != "+49 151 12345678" {
-		t.Errorf("contact[0].PhoneNumber = %q, want %q", contacts[0].Phones[0].PhoneNumber, "+49 151 12345678")
-	}
-
-	if contacts[1].FirstName != "Jane" {
-		t.Errorf("contact[1].FirstName = %q, want %q", contacts[1].FirstName, "Jane")
-	}
-}
-
-// Test parseVCard with empty phone numbers
-func TestParseVCardEmptyPhone(t *testing.T) {
-	vcardData := `BEGIN:VCARD
-VERSION:3.0
-FN:No Phone
-N:Phone;No;;;
-END:VCARD`
-
-	contacts := parseVCard(vcardData)
-
-	if len(contacts) != 0 {
-		t.Errorf("parseVCard should skip contacts without phone, got %d contacts", len(contacts))
-	}
-}
-
 // Test HTTP handler: addressbookHandler
 func TestAddressbookHandler(t *testing.T) {
 	tmpFile := "contacts.json"
@@ -459,8 +407,13 @@ func TestRootHandler(t *testing.T) {
 
 	handler(w, req)
 
-	if w.Result().StatusCode != http.StatusOK {
-		t.Errorf("GET / status = %d, want %d", w.Result().StatusCode, http.StatusOK)
+	if w.Result().StatusCode != http.StatusFound && w.Result().StatusCode != http.StatusSeeOther {
+		t.Errorf("GET / status = %d, want redirect (302 or 303)", w.Result().StatusCode)
+	}
+
+	location := w.Header().Get("Location")
+	if location != "/contacts" {
+		t.Errorf("GET / Location = %q, want %q", location, "/contacts")
 	}
 
 	// Test non-root path (should return 404)
@@ -591,57 +544,6 @@ func TestWebEditHandlerPOST(t *testing.T) {
 	contacts, _ = loadContacts(tmpFile)
 	if len(contacts) != 2 {
 		t.Errorf("after delete, contacts count = %d, want 2", len(contacts))
-	}
-}
-
-// Test HTTP handler: webImportHandler
-func TestWebImportHandler(t *testing.T) {
-	tmpFile := "contacts.json"
-	originalData, _ := os.ReadFile(tmpFile)
-	defer os.WriteFile(tmpFile, originalData, 0644)
-
-	saveContacts(tmpFile, []Contact{})
-
-	// Test GET
-	req := httptest.NewRequest("GET", "/contacts/import", nil)
-	w := httptest.NewRecorder()
-
-	webImportHandler(w, req)
-
-	if w.Result().StatusCode != http.StatusOK {
-		t.Errorf("GET status = %d, want %d", w.Result().StatusCode, http.StatusOK)
-	}
-
-	// Test POST with vCard file
-	vcardData := `BEGIN:VCARD
-VERSION:3.0
-FN:Import Test
-N:Test;Import;;;
-TEL:+49 151 11111111
-END:VCARD`
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, _ := writer.CreateFormFile("vcardfile", "test.vcf")
-	part.Write([]byte(vcardData))
-	writer.Close()
-
-	req = httptest.NewRequest("POST", "/contacts/import", body)
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	w = httptest.NewRecorder()
-
-	webImportHandler(w, req)
-
-	if w.Result().StatusCode != http.StatusSeeOther {
-		t.Errorf("POST status = %d, want %d", w.Result().StatusCode, http.StatusSeeOther)
-	}
-
-	contacts, _ := loadContacts(tmpFile)
-	if len(contacts) != 1 {
-		t.Errorf("contacts count = %d, want 1", len(contacts))
-	}
-	if contacts[0].FirstName != "Import" {
-		t.Errorf("imported contact FirstName = %q, want %q", contacts[0].FirstName, "Import")
 	}
 }
 

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -494,108 +493,6 @@ func normalizePhoneNumber(phone string) string {
 }
 
 
-
-func parseVCard(vcardData string) []Contact {
-	var contacts []Contact
-	scanner := bufio.NewScanner(strings.NewReader(vcardData))
-	
-	var currentContact *Contact
-	
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		
-		if line == "BEGIN:VCARD" {
-			currentContact = &Contact{
-				Phones: []Phone{},
-				Groups: Groups{
-					GroupID: 1,
-				},
-			}
-		} else if line == "END:VCARD" {
-			if currentContact != nil && len(currentContact.Phones) > 0 {
-				contacts = append(contacts, *currentContact)
-			}
-			currentContact = nil
-		} else if currentContact != nil {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				key := parts[0]
-				value := parts[1]
-				
-				if strings.HasPrefix(key, "FN") {
-					nameParts := strings.Fields(value)
-					if len(nameParts) >= 2 {
-						currentContact.FirstName = nameParts[0]
-						currentContact.LastName = strings.Join(nameParts[1:], " ")
-					} else if len(nameParts) == 1 {
-						currentContact.FirstName = nameParts[0]
-					}
-				} else if strings.HasPrefix(key, "N") {
-					nameParts := strings.Split(value, ";")
-					if len(nameParts) >= 2 {
-						currentContact.LastName = nameParts[0]
-						currentContact.FirstName = nameParts[1]
-					}
-				} else if strings.HasPrefix(key, "TEL") {
-					phone := strings.TrimSpace(value)
-					phone = normalizePhoneNumber(phone)
-					// Add the first phone we find
-					if len(currentContact.Phones) == 0 {
-						currentContact.Phones = append(currentContact.Phones, Phone{
-							PhoneNumber:  phone,
-							Type:         "cell",
-							AccountIndex: 0,
-						})
-					}
-				}
-			}
-		}
-	}
-	
-	return contacts
-}
-
-func webImportHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" {
-		file, _, err := r.FormFile("vcardfile")
-		if err != nil {
-			http.Error(w, "Failed to read file", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		scanner := bufio.NewScanner(file)
-		var vcardData strings.Builder
-		for scanner.Scan() {
-			vcardData.WriteString(scanner.Text())
-			vcardData.WriteString("\n")
-		}
-
-		newContacts := parseVCard(vcardData.String())
-		
-		if len(newContacts) == 0 {
-			http.Error(w, "No valid contacts found in vCard file", http.StatusBadRequest)
-			return
-		}
-
-		existingContacts, err := loadContacts(dataDir + "/contacts.json")
-		if err != nil {
-			existingContacts = []Contact{}
-		}
-
-		existingContacts = append(existingContacts, newContacts...)
-
-		if err := saveContacts(dataDir+"/contacts.json", existingContacts); err != nil {
-			http.Error(w, "Failed to save contacts", http.StatusInternalServerError)
-			return
-		}
-
-		http.Redirect(w, r, "/contacts", http.StatusSeeOther)
-		return
-	}
-
-	templates.ExecuteTemplate(w, "import.html", nil)
-}
 
 func importFromCardDAV(cardDAVURL, username, password, addressBookPath, groupFilter string, phoneFilterExclude []string) ([]Contact, error) {
 	ctx := context.Background()
@@ -1305,7 +1202,6 @@ func main() {
 	mux.HandleFunc("/contacts", authMiddleware(webListHandler))
 	mux.HandleFunc("/contacts/edit", authMiddleware(webEditHandler))
 	mux.HandleFunc("/contacts/new", authMiddleware(webEditHandler))
-	mux.HandleFunc("/contacts/import", authMiddleware(webImportHandler))
 	mux.HandleFunc("/contacts/sync-carddav", authMiddleware(webCardDAVSyncHandler))
 
 	loggedMux := loggingMiddleware(mux)
