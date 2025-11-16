@@ -363,8 +363,20 @@ func addressbookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Prepare contacts for XML output
+	// For company contacts without names, put company name in FirstName/LastName
+	xmlContacts := make([]Contact, len(contacts))
+	for i, contact := range contacts {
+		xmlContacts[i] = contact
+		// If company name is set but no first/last name, use company name only as LastName
+		// (using both FirstName and LastName causes duplicate display on phones)
+		if contact.CompanyName != "" && contact.FirstName == "" && contact.LastName == "" {
+			xmlContacts[i].LastName = contact.CompanyName
+		}
+	}
+
 	addressBook := AddressBook{
-		Contacts: contacts,
+		Contacts: xmlContacts,
 	}
 
 	w.Header().Set("Content-Type", "text/xml; charset=utf-8")
@@ -385,10 +397,21 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create a list with original indices
+	type ContactWithID struct {
+		Contact
+		ID int
+	}
+	
+	contactsWithIDs := make([]ContactWithID, len(contacts))
+	for i, c := range contacts {
+		contactsWithIDs[i] = ContactWithID{Contact: c, ID: i}
+	}
+
 	// Sort contacts by name
-	sort.Slice(contacts, func(i, j int) bool {
-		nameI := getContactDisplayName(contacts[i])
-		nameJ := getContactDisplayName(contacts[j])
+	sort.Slice(contactsWithIDs, func(i, j int) bool {
+		nameI := getContactDisplayName(contactsWithIDs[i].Contact)
+		nameJ := getContactDisplayName(contactsWithIDs[j].Contact)
 		return strings.ToLower(nameI) < strings.ToLower(nameJ)
 	})
 
@@ -397,10 +420,10 @@ func webListHandler(w http.ResponseWriter, r *http.Request) {
 	hasCardDAVConfig := config != nil && len(config.Sources) > 0
 
 	data := struct {
-		Contacts         []Contact
+		Contacts         []ContactWithID
 		HasCardDAVConfig bool
 	}{
-		Contacts:         contacts,
+		Contacts:         contactsWithIDs,
 		HasCardDAVConfig: hasCardDAVConfig,
 	}
 

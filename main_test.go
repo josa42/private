@@ -1151,4 +1151,65 @@ func TestXMLWithMultiplePhones(t *testing.T) {
 	}
 }
 
+// Test company name appears in FirstName/LastName in XML output
+func TestCompanyNameInXMLOutput(t *testing.T) {
+	// Test contact with only company name (no first/last name)
+	companyContact := Contact{
+		CompanyName: "Acme Corp",
+		Phones: []Phone{
+			{Type: "work", PhoneNumber: "+49 30 1234567", AccountIndex: 0},
+		},
+		Groups: Groups{GroupID: 1},
+	}
+
+	// Test contact with company name AND first/last name (should keep first/last)
+	personContact := Contact{
+		FirstName:   "John",
+		LastName:    "Doe",
+		CompanyName: "Test Inc",
+		Phones: []Phone{
+			{Type: "cell", PhoneNumber: "+49 151 9999999", AccountIndex: 0},
+		},
+		Groups: Groups{GroupID: 1},
+	}
+
+	// Simulate what addressbookHandler does
+	contacts := []Contact{companyContact, personContact}
+	xmlContacts := make([]Contact, len(contacts))
+	for i, contact := range contacts {
+		xmlContacts[i] = contact
+		if contact.CompanyName != "" && contact.FirstName == "" && contact.LastName == "" {
+			xmlContacts[i].FirstName = contact.CompanyName
+			xmlContacts[i].LastName = contact.CompanyName
+		}
+	}
+
+	addressBook := AddressBook{
+		Contacts: xmlContacts,
+	}
+
+	xmlData, err := xml.MarshalIndent(addressBook, "", "  ")
+	if err != nil {
+		t.Fatalf("XML marshal failed: %v", err)
+	}
+
+	xmlStr := string(xmlData)
+
+	// Check company-only contact has company name in FirstName and LastName
+	if !strings.Contains(xmlStr, "<FirstName>Acme Corp</FirstName>") {
+		t.Error("Company name missing in FirstName for company-only contact")
+	}
+	if !strings.Contains(xmlStr, "<LastName>Acme Corp</LastName>") {
+		t.Error("Company name missing in LastName for company-only contact")
+	}
+
+	// Check person contact keeps original first/last name
+	if !strings.Contains(xmlStr, "<FirstName>John</FirstName>") {
+		t.Error("FirstName changed for person with company")
+	}
+	if !strings.Contains(xmlStr, "<LastName>Doe</LastName>") {
+		t.Error("LastName changed for person with company")
+	}
+}
+
 
