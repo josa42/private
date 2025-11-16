@@ -902,3 +902,146 @@ func TestAddUserNewFile(t *testing.T) {
 	}
 }
 
+// Test synced contacts cannot be edited
+func TestSyncedContactsCannotBeEdited(t *testing.T) {
+	tmpFile := "contacts.json"
+	originalData, _ := os.ReadFile(tmpFile)
+	defer os.WriteFile(tmpFile, originalData, 0644)
+
+	testContacts := []Contact{
+		{
+			FirstName: "Synced",
+			LastName:  "Contact",
+			Phone: Phone{
+				Type:         "cell",
+				PhoneNumber:  "+49 151 12345678",
+				AccountIndex: 0,
+			},
+			Groups: Groups{GroupID: 1},
+			Source: "carddav:Test Source", // Synced contacts have a source
+		},
+	}
+	saveContacts(tmpFile, testContacts)
+
+	// Try to edit synced contact
+	form := url.Values{}
+	form.Add("id", "0")
+	form.Add("firstName", "Modified")
+	form.Add("lastName", "Contact")
+	form.Add("phoneNumber", "+49 151 99999999")
+	form.Add("phoneType", "cell")
+
+	req := httptest.NewRequest("POST", "/contacts/edit", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	webEditHandler(w, req)
+
+	// Should return error (403 Forbidden)
+	if w.Result().StatusCode != http.StatusForbidden {
+		t.Errorf("expected status %d, got %d", http.StatusForbidden, w.Result().StatusCode)
+	}
+
+	// Verify contact was not modified
+	contacts, _ := loadContacts(tmpFile)
+	if contacts[0].FirstName != "Synced" {
+		t.Errorf("synced contact was modified: FirstName = %q, want %q", contacts[0].FirstName, "Synced")
+	}
+
+	// Try to delete synced contact
+	form = url.Values{}
+	form.Add("action", "delete")
+	form.Add("id", "0")
+
+	req = httptest.NewRequest("POST", "/contacts/edit", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w = httptest.NewRecorder()
+
+	webEditHandler(w, req)
+
+	// Should return error (403 Forbidden)
+	if w.Result().StatusCode != http.StatusForbidden {
+		t.Errorf("expected status %d, got %d", http.StatusForbidden, w.Result().StatusCode)
+	}
+
+	// Verify contact was not deleted
+	contacts, _ = loadContacts(tmpFile)
+	if len(contacts) != 1 {
+		t.Errorf("synced contact was deleted: count = %d, want 1", len(contacts))
+	}
+}
+
+// Test phone number normalization edge cases
+func TestPhoneNormalizationEdgeCases(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// Stuttgart area code: 0711 -> +49 711
+		{"0711 1234567", "+49 711 1234567"},
+		{"07111234567", "+49 711 1234567"},
+		{"+49 711 1234567", "+49 711 1234567"},
+		
+		// Note: 07115 is actually interpreted as 0711 (Stuttgart) + 5 (first digit of number)
+		// The library detects this correctly
+		{"07115 123456", "+49 711 5123456"},
+		{"+49 7115 123456", "+49 711 5123456"}, // Library normalizes this
+		
+		// Berlin: 030 -> +49 30
+		{"030 12345678", "+49 30 12345678"},
+		{"03012345678", "+49 30 12345678"},
+		
+		// Munich: 089 -> +49 89
+		{"089 12345678", "+49 89 12345678"},
+		
+		// Mobile numbers
+		{"0151 12345678", "+49 151 12345678"},
+		{"0171 12345678", "+49 171 12345678"},
+		
+		// Already normalized
+		{"+49 711 1234567", "+49 711 1234567"},
+		{"+49 151 12345678", "+49 151 12345678"},
+		
+		// With parentheses
+		{"+49(151)12345678", "+49 151 12345678"},
+	}
+
+	for _, tt := range tests {
+		got := normalizePhoneNumber(tt.input)
+		if got != tt.want {
+			t.Errorf("normalizePhoneNumber(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+// Test that manually created contacts are not marked as synced
+func TestManualContactsNotSynced(t *testing.T) {
+	tmpFile := "contacts.json"
+	originalData, _ := os.ReadFile(tmpFile)
+	defer os.WriteFile(tmpFile, originalData, 0644)
+
+	saveContacts(tmpFile, []Contact{})
+
+	// Create new contact via form
+	form := url.Values{}
+	form.Add("firstName", "Manual")
+	form.Add("lastName", "Contact")
+	form.Add("phoneNumber", "+49 151 12345678")
+	form.Add("phoneType", "cell")
+
+	req := httptest.NewRequest("POST", "/contacts/edit", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+
+	webEditHandler(w, req)
+
+	contacts, _ := loadContacts(tmpFile)
+	if len(contacts) != 1 {
+		t.Fatalf("expected 1 contact, got %d", len(contacts))
+	}
+
+	if contacts[0].Source != "" {
+		t.Errorf("manually created contact should not have source, got: %q", contacts[0].Source)
+	}
+}
+
