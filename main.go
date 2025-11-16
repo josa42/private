@@ -480,8 +480,7 @@ func parseVCard(vcardData string) []Contact {
 					}
 				} else if strings.HasPrefix(key, "TEL") {
 					phone := strings.TrimSpace(value)
-					phone = strings.ReplaceAll(phone, " ", "")
-					phone = strings.ReplaceAll(phone, "-", "")
+					phone = normalizePhoneNumber(phone)
 					if currentContact.Phone.PhoneNumber == "" {
 						currentContact.Phone.PhoneNumber = phone
 					}
@@ -934,9 +933,8 @@ func vCardToContactWithFilter(card vcard.Card, phoneFilterExclude []string) Cont
 	}
 
 	if selectedPhone != "" {
-		// Clean and normalize phone number
-		selectedPhone = strings.ReplaceAll(selectedPhone, " ", "")
-		selectedPhone = strings.ReplaceAll(selectedPhone, "-", "")
+		// Normalize phone number
+		selectedPhone = normalizePhoneNumber(selectedPhone)
 		contact.Phone.PhoneNumber = selectedPhone
 		contact.Phone.Type = phoneType
 	}
@@ -1054,7 +1052,7 @@ func webEditHandler(w http.ResponseWriter, r *http.Request) {
 		firstName := r.FormValue("firstName")
 		lastName := r.FormValue("lastName")
 		companyName := r.FormValue("companyName")
-		phoneNumber := r.FormValue("phoneNumber")
+		phoneNumber := normalizePhoneNumber(r.FormValue("phoneNumber"))
 		phoneType := r.FormValue("phoneType")
 
 		contact := Contact{

@@ -296,8 +296,8 @@ END:VCARD`
 	if contacts[0].LastName != "Doe" {
 		t.Errorf("contact[0].LastName = %q, want %q", contacts[0].LastName, "Doe")
 	}
-	if contacts[0].Phone.PhoneNumber != "+4915112345678" {
-		t.Errorf("contact[0].PhoneNumber = %q, want %q", contacts[0].Phone.PhoneNumber, "+4915112345678")
+	if contacts[0].Phone.PhoneNumber != "+49 151 12345678" {
+		t.Errorf("contact[0].PhoneNumber = %q, want %q", contacts[0].Phone.PhoneNumber, "+49 151 12345678")
 	}
 
 	if contacts[1].FirstName != "Jane" {
